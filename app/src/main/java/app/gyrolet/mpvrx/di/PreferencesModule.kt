@@ -14,6 +14,7 @@ import app.gyrolet.mpvrx.preferences.AiPreferences
 import app.gyrolet.mpvrx.preferences.AppearancePreferences
 import app.gyrolet.mpvrx.preferences.AudioPreferences
 import app.gyrolet.mpvrx.preferences.BrowserPreferences
+import app.gyrolet.mpvrx.preferences.DebridPreferences
 import app.gyrolet.mpvrx.preferences.DecoderPreferences
 import app.gyrolet.mpvrx.preferences.DownloadPreferences
 import app.gyrolet.mpvrx.preferences.FoldersPreferences
@@ -54,4 +55,5 @@ val PreferencesModule =
     singleOf(::SeerrPreferences)
     singleOf(::MediaServerPreferences)
     singleOf(::DownloadPreferences)
+    singleOf(::DebridPreferences)
   }
