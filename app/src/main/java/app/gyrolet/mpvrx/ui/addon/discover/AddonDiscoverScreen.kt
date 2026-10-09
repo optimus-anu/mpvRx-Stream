@@ -19,14 +19,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -66,6 +65,7 @@ object AddonDiscoverScreen : Screen {
     val isSearching by viewModel.isSearching.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val catalogRows by viewModel.catalogRows.collectAsState()
+    val isLoadingCatalogs by viewModel.isLoadingCatalogs.collectAsState()
 
     Scaffold(
       topBar = {
@@ -115,7 +115,11 @@ object AddonDiscoverScreen : Screen {
               modifier = Modifier.fillMaxSize(),
               contentAlignment = Alignment.Center,
             ) {
-              CircularProgressIndicator()
+              Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Searching catalogs...")
+              }
             }
           } else if (searchResults.isEmpty()) {
             Box(
@@ -147,7 +151,7 @@ object AddonDiscoverScreen : Screen {
           }
         } else {
           // Catalogs View
-          if (catalogRows.isEmpty()) {
+          if (isLoadingCatalogs) {
             Box(
               modifier = Modifier.fillMaxSize(),
               contentAlignment = Alignment.Center,
@@ -156,10 +160,37 @@ object AddonDiscoverScreen : Screen {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                  text = "Loading catalog rows from active addons...",
+                  text = "Loading catalog rows...",
                   style = MaterialTheme.typography.bodyMedium,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+              }
+            }
+          } else if (catalogRows.isEmpty()) {
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+              contentAlignment = Alignment.Center,
+            ) {
+              Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                  text = "No catalog rows found.",
+                  style = MaterialTheme.typography.titleMedium,
+                  fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                  text = "Install Cinemeta or other Stremio catalog addons to display popular movies & shows.",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                  onClick = { viewModel.loadCatalogs() },
+                ) {
+                  Text("Retry / Load Catalogs")
+                }
               }
             }
           } else {

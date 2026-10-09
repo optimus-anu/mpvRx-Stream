@@ -44,9 +44,12 @@ class AddonDiscoverViewModel(
   private val _catalogRows = MutableStateFlow<List<CatalogRowState>>(emptyList())
   val catalogRows: StateFlow<List<CatalogRowState>> = _catalogRows.asStateFlow()
 
+  private val _isLoadingCatalogs = MutableStateFlow(true)
+  val isLoadingCatalogs: StateFlow<Boolean> = _isLoadingCatalogs.asStateFlow()
+
   init {
     viewModelScope.launch {
-      addonManager.enabledAddons.collectLatest { _ ->
+      addonManager.enabledAddons.collectLatest {
         loadCatalogs()
       }
     }
@@ -64,6 +67,9 @@ class AddonDiscoverViewModel(
 
   fun loadCatalogs() {
     viewModelScope.launch {
+      _isLoadingCatalogs.value = true
+      addonManager.ensureDefaultAddonsInstalled()
+
       val defaultCatalogs = listOf(
         Pair("movie", "top"),
         Pair("series", "top"),
@@ -77,7 +83,7 @@ class AddonDiscoverViewModel(
           val title = if (type == "movie") "Popular Movies" else "Popular TV Shows"
           rows.add(
             CatalogRowState(
-              addonName = "Stremio Addons",
+              addonName = "Cinemeta",
               catalogTitle = title,
               type = type,
               catalogId = catalogId,
@@ -89,6 +95,7 @@ class AddonDiscoverViewModel(
       }
 
       _catalogRows.value = rows
+      _isLoadingCatalogs.value = false
     }
   }
 
