@@ -968,6 +968,30 @@ val MIGRATION_30_31 =
     }
   }
 
+val MIGRATION_31_32 =
+  object : Migration(31, 32) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `stremio_addons` (
+          `manifestUrl` TEXT NOT NULL,
+          `id` TEXT NOT NULL,
+          `name` TEXT NOT NULL,
+          `version` TEXT NOT NULL,
+          `description` TEXT,
+          `icon` TEXT,
+          `baseUrl` TEXT NOT NULL,
+          `types` TEXT NOT NULL,
+          `manifestJson` TEXT NOT NULL,
+          `isEnabled` INTEGER NOT NULL DEFAULT 1,
+          `installedAt` INTEGER NOT NULL,
+          PRIMARY KEY(`manifestUrl`)
+        )
+        """.trimIndent(),
+      )
+    }
+  }
+
 val MIGRATION_24_25 =
   object : Migration(24, 25) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -1037,6 +1061,7 @@ val DatabaseModule =
           MIGRATION_28_29,
           MIGRATION_29_30,
           MIGRATION_30_31,
+          MIGRATION_31_32,
         ).build()
     }
 
@@ -1168,6 +1193,31 @@ val DatabaseModule =
       app.gyrolet.mpvrx.repository.AudiobookshelfRepository(
         dao = get(),
         client = get(),
+      )
+    }
+
+    single {
+      get<MpvRxDatabase>().stremioAddonDao()
+    }
+
+    single {
+      app.gyrolet.mpvrx.data.addon.AddonClient(
+        okHttpClient = get(),
+        json = get(),
+      )
+    }
+
+    single {
+      app.gyrolet.mpvrx.data.addon.AddonRepository(
+        addonDao = get(),
+      )
+    }
+
+    single {
+      app.gyrolet.mpvrx.data.addon.AddonManager(
+        addonClient = get(),
+        addonRepository = get(),
+        json = get(),
       )
     }
   }
