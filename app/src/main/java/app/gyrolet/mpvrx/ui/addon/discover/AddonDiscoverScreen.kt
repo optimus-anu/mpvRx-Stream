@@ -1,0 +1,207 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+package app.gyrolet.mpvrx.ui.addon.discover
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import app.gyrolet.mpvrx.presentation.Screen
+import app.gyrolet.mpvrx.ui.addon.components.StremioCard
+import app.gyrolet.mpvrx.ui.addon.detail.StremioDetailScreen
+import app.gyrolet.mpvrx.ui.addon.management.AddonManagementScreen
+import app.gyrolet.mpvrx.ui.icons.Icon
+import app.gyrolet.mpvrx.ui.icons.Icons
+import app.gyrolet.mpvrx.ui.utils.LocalBackStack
+import app.gyrolet.mpvrx.ui.utils.navigateTo
+import kotlinx.serialization.Serializable
+import org.koin.compose.viewmodel.koinViewModel
+
+@Serializable
+object AddonDiscoverScreen : Screen {
+
+  @OptIn(ExperimentalMaterial3Api::class)
+  @Composable
+  override fun Content() {
+    val viewModel: AddonDiscoverViewModel = koinViewModel()
+    val backStack = LocalBackStack.current
+
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val isSearching by viewModel.isSearching.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
+    val catalogRows by viewModel.catalogRows.collectAsState()
+
+    Scaffold(
+      topBar = {
+        TopAppBar(
+          title = { Text("Discover & Addons") },
+          actions = {
+            IconButton(onClick = { backStack.navigateTo(AddonManagementScreen) }) {
+              Icon(
+                Icons.RoundedFilled.Extension,
+                contentDescription = "Manage Addons",
+              )
+            }
+          },
+        )
+      },
+    ) { padding ->
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(padding),
+      ) {
+        // Search bar
+        OutlinedTextField(
+          value = searchQuery,
+          onValueChange = viewModel::onSearchQueryChanged,
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+          placeholder = { Text("Search movies, TV series...") },
+          singleLine = true,
+          leadingIcon = {
+            Icon(Icons.RoundedFilled.Search, contentDescription = "Search")
+          },
+          trailingIcon = {
+            if (searchQuery.isNotBlank()) {
+              IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                Icon(Icons.RoundedFilled.Close, contentDescription = "Clear")
+              }
+            }
+          },
+        )
+
+        if (searchQuery.isNotBlank()) {
+          // Search Results View
+          if (isSearching) {
+            Box(
+              modifier = Modifier.fillMaxSize(),
+              contentAlignment = Alignment.Center,
+            ) {
+              CircularProgressIndicator()
+            }
+          } else if (searchResults.isEmpty()) {
+            Box(
+              modifier = Modifier.fillMaxSize(),
+              contentAlignment = Alignment.Center,
+            ) {
+              Text(
+                text = "No results found for '$searchQuery'",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          } else {
+            LazyVerticalGrid(
+              columns = GridCells.Adaptive(minSize = 130.dp),
+              contentPadding = PaddingValues(16.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+              verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+              items(searchResults, key = { it.id }) { item ->
+                StremioCard(
+                  meta = item,
+                  onClick = {
+                    backStack.navigateTo(StremioDetailScreen(metaId = item.id, type = item.type))
+                  },
+                )
+              }
+            }
+          }
+        } else {
+          // Catalogs View
+          if (catalogRows.isEmpty()) {
+            Box(
+              modifier = Modifier.fillMaxSize(),
+              contentAlignment = Alignment.Center,
+            ) {
+              Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                  text = "Loading catalog rows from active addons...",
+                  style = MaterialTheme.typography.bodyMedium,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
+          } else {
+            LazyColumn(
+              contentPadding = PaddingValues(bottom = 24.dp),
+              verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+              items(catalogRows, key = { "${it.type}_${it.catalogId}" }) { row ->
+                Column {
+                  Row(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                  ) {
+                    Text(
+                      text = row.catalogTitle,
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                    )
+                  }
+
+                  LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                  ) {
+                    items(row.items, key = { it.id }) { item ->
+                      StremioCard(
+                        meta = item,
+                        onClick = {
+                          backStack.navigateTo(StremioDetailScreen(metaId = item.id, type = item.type))
+                        },
+                      )
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

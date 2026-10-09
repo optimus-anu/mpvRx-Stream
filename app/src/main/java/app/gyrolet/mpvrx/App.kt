@@ -146,6 +146,7 @@ class App :
         FileManagerModule,
         app.gyrolet.mpvrx.di.domainModule,
         app.gyrolet.mpvrx.di.DownloadModule,
+        app.gyrolet.mpvrx.di.addonModule,
       )
     }
     if (!BuildConfig.MPV_SUPPORTS_VULKAN) {
