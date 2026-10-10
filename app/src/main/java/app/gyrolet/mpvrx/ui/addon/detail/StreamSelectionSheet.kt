@@ -201,10 +201,14 @@ private fun StremioStream.matchesQualityFilter(filter: String): Boolean {
     behaviorHints?.filename,
   ).joinToString(" ").lowercase()
 
+  val is4k = fullText.contains("4k") || fullText.contains("2160p") || fullText.contains("2160") || fullText.contains("uhd")
+  val is1080p = fullText.contains("1080p") || fullText.contains("1080") || fullText.contains("fhd")
+  val is720p = fullText.contains("720p") || fullText.contains("720")
+
   return when (filter) {
-    "4K" -> fullText.contains("4k") || fullText.contains("2160p") || fullText.contains("2160") || fullText.contains("uhd")
-    "1080p" -> fullText.contains("1080p") || fullText.contains("1080") || fullText.contains("fhd")
-    "720p" -> fullText.contains("720p") || fullText.contains("720") || fullText.contains("hd")
+    "4K" -> is4k
+    "1080p" -> is1080p && !is4k
+    "720p" -> is720p && !is4k && !is1080p
     "Torrent" -> isTorrent
     "Direct" -> isDirectHttpUrl
     else -> true
