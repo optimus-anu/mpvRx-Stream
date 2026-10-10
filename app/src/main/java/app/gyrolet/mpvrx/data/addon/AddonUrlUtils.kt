@@ -20,6 +20,9 @@ object AddonUrlUtils {
    */
   fun normalizeManifestUrl(rawUrl: String): String {
     var url = rawUrl.trim()
+    if (url.equals("cinemeta", ignoreCase = true) || url.equals("v3-cinemeta", ignoreCase = true) || url.contains("cinemeta.strem.io", ignoreCase = true)) {
+      return "https://v3-cinemeta.strem.io/manifest.json"
+    }
     if (url.startsWith("stremio://", ignoreCase = true)) {
       url = "https://" + url.substring("stremio://".length)
     } else if (url.startsWith("stremios://", ignoreCase = true)) {

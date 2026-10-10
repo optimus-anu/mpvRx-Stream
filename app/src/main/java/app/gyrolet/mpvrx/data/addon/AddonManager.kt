@@ -138,7 +138,7 @@ class AddonManager(
       if (isSearch) {
         manifest.catalogs.any { cat ->
           cat.type == type && (
-            cat.extra.any { it.name == "search" } ||
+            cat.extra?.any { it.name == "search" } == true ||
             cat.extraSupported?.contains("search") == true ||
             cat.id == catalogId ||
             cat.id == "top" ||
@@ -157,7 +157,7 @@ class AddonManager(
       val matchingCatalogs = if (isSearch) {
         manifest.catalogs.filter { cat ->
           cat.type == type && (
-            cat.extra.any { it.name == "search" } ||
+            cat.extra?.any { it.name == "search" } == true ||
             cat.extraSupported?.contains("search") == true ||
             cat.id == catalogId ||
             cat.id == "top"
