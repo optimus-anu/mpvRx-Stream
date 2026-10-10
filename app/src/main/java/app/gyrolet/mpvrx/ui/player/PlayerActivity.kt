@@ -232,6 +232,8 @@ class PlayerActivity :
 
   private val torrentStreamingEngine: TorrentStreamingEngine by inject()
 
+  private val stremioPlaybackTracker: app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker by inject()
+
   private val networkStreamEntryRepository: NetworkStreamEntryRepository by inject()
 
   private val networkHttpClient: OkHttpClient by inject()
@@ -1658,6 +1660,7 @@ class PlayerActivity :
       if (playbackWasInitialized && ownsPlaybackSession && !scriptRuntimeRestartPending) saveVideoPlaybackState(fileName, immediate = true)
       if (playbackWasInitialized && ownsPlaybackSession && !keepBackgroundPlaybackAlive) {
         reportJellyfinStop()
+        reportStremioStop()
       }
 
       if ((isUserFinishing || isFinishing || scriptRuntimeRestartPending) && !keepBackgroundPlaybackAlive) {
@@ -1946,6 +1949,7 @@ class PlayerActivity :
 
       if (!isBackgroundPlaybackSessionActive) {
         reportJellyfinStop()
+        reportStremioStop()
       }
       setReturnIntent()
     }.onFailure { e ->
@@ -4559,6 +4563,10 @@ class PlayerActivity :
       startJellyfinProgressLoop()
     }
 
+    if (intent.getStringExtra("launch_source") == "stremio_addon") {
+      startStremioProgressLoop()
+    }
+
     // Reset AB loop values when video changes
     viewModel.clearABLoop()
 
@@ -5032,6 +5040,78 @@ class PlayerActivity :
       val currentPosMs = readMpvIntSeconds("time-pos", viewModel.pos ?: 0).toLong() * 1000L
       reporter.reportPlaybackStop(currentPosMs)
       jellyfinSessionReporter = null
+    }
+  }
+
+  private var stremioProgressJob: Job? = null
+
+  private fun startStremioProgressLoop() {
+    val mediaId = intent.getStringExtra("stremio_media_id") ?: return
+    val type = intent.getStringExtra("stremio_type") ?: "movie"
+    val seriesId = intent.getStringExtra("stremio_series_id")
+    val season = intent.getIntExtra("stremio_season", -1).takeIf { it != -1 }
+    val episode = intent.getIntExtra("stremio_episode", -1).takeIf { it != -1 }
+    val title = intent.getStringExtra("stremio_title") ?: getTitleForControls()
+    val episodeTitle = intent.getStringExtra("stremio_episode_title")
+    val posterUrl = intent.getStringExtra("stremio_poster_url")
+    val bannerUrl = intent.getStringExtra("stremio_banner_url")
+
+    stremioProgressJob?.cancel()
+    stremioProgressJob = lifecycleScope.launch {
+      while (isActive) {
+        delay(5000)
+        val posMs = (readMpvIntSeconds("time-pos", viewModel.pos ?: 0).toLong() * 1000L).coerceAtLeast(0L)
+        val durMs = (readMpvIntSeconds("duration", viewModel.duration ?: 0).toLong() * 1000L).coerceAtLeast(0L)
+
+        if (posMs > 0) {
+          stremioPlaybackTracker.saveProgress(
+            mediaId = mediaId,
+            type = type,
+            seriesId = seriesId,
+            season = season,
+            episode = episode,
+            title = title,
+            episodeTitle = episodeTitle,
+            posterUrl = posterUrl,
+            bannerUrl = bannerUrl,
+            positionMs = posMs,
+            durationMs = durMs,
+          )
+        }
+      }
+    }
+  }
+
+  private fun reportStremioStop() {
+    stremioProgressJob?.cancel()
+    stremioProgressJob = null
+    val mediaId = intent.getStringExtra("stremio_media_id") ?: return
+    val type = intent.getStringExtra("stremio_type") ?: "movie"
+    val seriesId = intent.getStringExtra("stremio_series_id")
+    val season = intent.getIntExtra("stremio_season", -1).takeIf { it != -1 }
+    val episode = intent.getIntExtra("stremio_episode", -1).takeIf { it != -1 }
+    val title = intent.getStringExtra("stremio_title") ?: getTitleForControls()
+    val episodeTitle = intent.getStringExtra("stremio_episode_title")
+    val posterUrl = intent.getStringExtra("stremio_poster_url")
+    val bannerUrl = intent.getStringExtra("stremio_banner_url")
+
+    val posMs = (readMpvIntSeconds("time-pos", viewModel.pos ?: 0).toLong() * 1000L).coerceAtLeast(0L)
+    val durMs = (readMpvIntSeconds("duration", viewModel.duration ?: 0).toLong() * 1000L).coerceAtLeast(0L)
+
+    if (posMs > 0) {
+      stremioPlaybackTracker.saveProgress(
+        mediaId = mediaId,
+        type = type,
+        seriesId = seriesId,
+        season = season,
+        episode = episode,
+        title = title,
+        episodeTitle = episodeTitle,
+        posterUrl = posterUrl,
+        bannerUrl = bannerUrl,
+        positionMs = posMs,
+        durationMs = durMs,
+      )
     }
   }
 

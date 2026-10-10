@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ fun StremioCard(
   meta: StremioMeta,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
+  progressRatio: Float = 0f,
 ) {
   Card(
     modifier = modifier
@@ -105,6 +107,19 @@ fun StremioCard(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+          )
+        }
+
+        // Progress Bar Overlay
+        if (progressRatio > 0f) {
+          LinearProgressIndicator(
+            progress = { progressRatio },
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(3.dp)
+              .align(Alignment.BottomCenter),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = Color.Black.copy(alpha = 0.5f),
           )
         }
       }

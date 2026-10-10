@@ -992,6 +992,34 @@ val MIGRATION_31_32 =
     }
   }
 
+val MIGRATION_32_33 =
+  object : Migration(32, 33) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `stremio_playback_history` (
+          `mediaId` TEXT NOT NULL,
+          `type` TEXT NOT NULL,
+          `seriesId` TEXT,
+          `season` INTEGER,
+          `episode` INTEGER,
+          `title` TEXT NOT NULL,
+          `episodeTitle` TEXT,
+          `posterUrl` TEXT,
+          `bannerUrl` TEXT,
+          `lastPositionMs` INTEGER NOT NULL,
+          `durationMs` INTEGER NOT NULL,
+          `lastWatchedTimestamp` INTEGER NOT NULL,
+          `isFinished` INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY(`mediaId`)
+        )
+        """.trimIndent(),
+      )
+      db.execSQL("CREATE INDEX IF NOT EXISTS `index_stremio_playback_history_lastWatchedTimestamp` ON `stremio_playback_history` (`lastWatchedTimestamp`)")
+      db.execSQL("CREATE INDEX IF NOT EXISTS `index_stremio_playback_history_seriesId` ON `stremio_playback_history` (`seriesId`)")
+    }
+  }
+
 val MIGRATION_24_25 =
   object : Migration(24, 25) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -1062,6 +1090,7 @@ val DatabaseModule =
           MIGRATION_29_30,
           MIGRATION_30_31,
           MIGRATION_31_32,
+          MIGRATION_32_33,
         ).build()
     }
 
@@ -1218,6 +1247,16 @@ val DatabaseModule =
         addonClient = get(),
         addonRepository = get(),
         json = get(),
+      )
+    }
+
+    single {
+      get<MpvRxDatabase>().stremioPlaybackHistoryDao()
+    }
+
+    single {
+      app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker(
+        historyDao = get(),
       )
     }
   }

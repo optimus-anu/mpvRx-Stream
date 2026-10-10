@@ -9,26 +9,34 @@
 
 package app.gyrolet.mpvrx.ui.addon.discover
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -39,9 +47,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.gyrolet.mpvrx.database.entities.StremioPlaybackHistoryEntity
 import app.gyrolet.mpvrx.presentation.Screen
+import app.gyrolet.mpvrx.presentation.components.RemoteImage
 import app.gyrolet.mpvrx.ui.addon.components.StremioCard
 import app.gyrolet.mpvrx.ui.addon.detail.StremioDetailScreen
 import app.gyrolet.mpvrx.ui.addon.management.AddonManagementScreen
@@ -66,6 +80,7 @@ object AddonDiscoverScreen : Screen {
     val searchResults by viewModel.searchResults.collectAsState()
     val catalogRows by viewModel.catalogRows.collectAsState()
     val isLoadingCatalogs by viewModel.isLoadingCatalogs.collectAsState()
+    val continueWatching by viewModel.continueWatching.collectAsState()
 
     Scaffold(
       topBar = {
@@ -150,8 +165,8 @@ object AddonDiscoverScreen : Screen {
             }
           }
         } else {
-          // Catalogs View
-          if (isLoadingCatalogs) {
+          // Main Catalogs View
+          if (isLoadingCatalogs && continueWatching.isEmpty() && catalogRows.isEmpty()) {
             Box(
               modifier = Modifier.fillMaxSize(),
               contentAlignment = Alignment.Center,
@@ -166,7 +181,7 @@ object AddonDiscoverScreen : Screen {
                 )
               }
             }
-          } else if (catalogRows.isEmpty()) {
+          } else if (continueWatching.isEmpty() && catalogRows.isEmpty()) {
             Box(
               modifier = Modifier
                 .fillMaxSize()
@@ -198,6 +213,38 @@ object AddonDiscoverScreen : Screen {
               contentPadding = PaddingValues(bottom = 24.dp),
               verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
+              // Continue Watching Section
+              if (continueWatching.isNotEmpty()) {
+                item {
+                  Column {
+                    Text(
+                      text = "Continue Watching",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                      modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+
+                    LazyRow(
+                      contentPadding = PaddingValues(horizontal = 16.dp),
+                      horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                      items(continueWatching, key = { it.mediaId }) { historyItem ->
+                        ContinueWatchingCard(
+                          item = historyItem,
+                          onClick = {
+                            val targetId = historyItem.seriesId ?: historyItem.mediaId
+                            backStack.navigateTo(
+                              StremioDetailScreen(metaId = targetId, type = historyItem.type),
+                            )
+                          },
+                        )
+                      }
+                    }
+                  }
+                }
+              }
+
+              // Catalog Rows
               items(catalogRows, key = { "${it.type}_${it.catalogId}" }) { row ->
                 Column {
                   Row(
@@ -231,6 +278,88 @@ object AddonDiscoverScreen : Screen {
               }
             }
           }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun ContinueWatchingCard(
+  item: StremioPlaybackHistoryEntity,
+  onClick: () -> Unit,
+) {
+  Card(
+    modifier = Modifier
+      .width(160.dp)
+      .clip(RoundedCornerShape(12.dp))
+      .clickable(onClick = onClick),
+    shape = RoundedCornerShape(12.dp),
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+    ),
+  ) {
+    Column {
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .aspectRatio(16f / 9f)
+          .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+      ) {
+        val imageUrl = item.bannerUrl ?: item.posterUrl
+        if (!imageUrl.isNullOrBlank()) {
+          RemoteImage(
+            url = imageUrl,
+            contentDescription = item.title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+          )
+        }
+
+        Icon(
+          Icons.RoundedFilled.PlayArrow,
+          contentDescription = null,
+          tint = Color.White,
+          modifier = Modifier
+            .background(Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(20.dp))
+            .padding(6.dp),
+        )
+
+        // Progress Bar
+        if (item.progressRatio > 0f) {
+          LinearProgressIndicator(
+            progress = { item.progressRatio },
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(4.dp)
+              .align(Alignment.BottomCenter),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = Color.Black.copy(alpha = 0.5f),
+          )
+        }
+      }
+
+      Column(
+        modifier = Modifier.padding(8.dp),
+      ) {
+        Text(
+          text = item.title,
+          style = MaterialTheme.typography.bodySmall,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+
+        if (!item.episodeTitle.isNullOrBlank()) {
+          Spacer(modifier = Modifier.height(2.dp))
+          Text(
+            text = item.episodeTitle,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
         }
       }
     }

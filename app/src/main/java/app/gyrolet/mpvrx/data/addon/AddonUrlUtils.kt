@@ -97,7 +97,10 @@ object AddonUrlUtils {
 
   private fun encode(value: String): String {
     return try {
-      URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+      URLEncoder.encode(value, "UTF-8")
+        .replace("+", "%20")
+        .replace("%3A", ":")
+        .replace("%3a", ":")
     } catch (_: Exception) {
       value
     }

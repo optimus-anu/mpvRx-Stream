@@ -17,8 +17,8 @@ import org.koin.dsl.module
 
 val addonModule = module {
   viewModel { AddonManagementViewModel(get()) }
-  viewModel { AddonDiscoverViewModel(get()) }
+  viewModel { AddonDiscoverViewModel(get(), get()) }
   viewModel { (metaId: String, type: String) ->
-    StremioDetailViewModel(metaId, type, get(), get())
+    StremioDetailViewModel(metaId, type, get(), get(), get())
   }
 }

@@ -34,7 +34,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -45,10 +44,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.gyrolet.mpvrx.domain.addon.model.StremioStream
 import app.gyrolet.mpvrx.ui.icons.Icon
 import app.gyrolet.mpvrx.ui.icons.Icons
@@ -63,21 +62,34 @@ fun StreamSelectionSheet(
   onDismiss: () -> Unit,
 ) {
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-  var selectedFilter by remember { mutableStateOf("All") }
 
-  val filteredStreams = remember(streams, selectedFilter) {
-    when (selectedFilter) {
-      "4K" -> streams.filter { it.title?.contains("4k", ignoreCase = true) == true || it.name?.contains("4k", ignoreCase = true) == true }
-      "1080p" -> streams.filter { it.title?.contains("1080", ignoreCase = true) == true || it.name?.contains("1080", ignoreCase = true) == true }
-      "Torrent" -> streams.filter { it.isTorrent }
-      "Direct" -> streams.filter { it.isDirectHttpUrl }
-      else -> streams
+  var selectedAddonFilter by remember { mutableStateOf("All Addons") }
+  var selectedQualityFilter by remember { mutableStateOf("All") }
+
+  val addonNames = remember(streams) {
+    val names = streams.mapNotNull { it.addonName?.takeIf { n -> n.isNotBlank() } }.distinct().sorted()
+    listOf("All Addons") + names
+  }
+
+  val filteredStreams = remember(streams, selectedAddonFilter, selectedQualityFilter) {
+    streams.filter { stream ->
+      val addonMatches = if (selectedAddonFilter == "All Addons") true else stream.addonName == selectedAddonFilter
+      val qualityMatches = when (selectedQualityFilter) {
+        "4K" -> stream.title?.contains("4k", ignoreCase = true) == true || stream.name?.contains("4k", ignoreCase = true) == true || stream.title?.contains("2160", ignoreCase = true) == true
+        "1080p" -> stream.title?.contains("1080", ignoreCase = true) == true || stream.name?.contains("1080", ignoreCase = true) == true
+        "720p" -> stream.title?.contains("720", ignoreCase = true) == true || stream.name?.contains("720", ignoreCase = true) == true
+        "Torrent" -> stream.isTorrent
+        "Direct" -> stream.isDirectHttpUrl
+        else -> true
+      }
+      addonMatches && qualityMatches
     }
   }
 
   ModalBottomSheet(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
+    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
   ) {
     Column(
       modifier = Modifier
@@ -92,8 +104,8 @@ fun StreamSelectionSheet(
       ) {
         Column(modifier = Modifier.weight(1f)) {
           Text(
-            text = "Select Stream",
-            style = MaterialTheme.typography.titleMedium,
+            text = "Streams",
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
           )
           Text(
@@ -112,15 +124,31 @@ fun StreamSelectionSheet(
 
       Spacer(modifier = Modifier.height(12.dp))
 
-      // Filter Chips
+      // Addon Tabs (e.g., All Addons, Torrentio RD, AIOStreams)
+      if (addonNames.size > 2) {
+        LazyRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          items(addonNames) { addon ->
+            FilterChip(
+              selected = selectedAddonFilter == addon,
+              onClick = { selectedAddonFilter = addon },
+              label = { Text(addon, fontWeight = FontWeight.SemiBold) },
+            )
+          }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+      }
+
+      // Quality Filter Chips
       LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
-        val filters = listOf("All", "4K", "1080p", "Torrent", "Direct")
+        val filters = listOf("All", "4K", "1080p", "720p", "Torrent", "Direct")
         items(filters) { filter ->
           FilterChip(
-            selected = selectedFilter == filter,
-            onClick = { selectedFilter = filter },
+            selected = selectedQualityFilter == filter,
+            onClick = { selectedQualityFilter = filter },
             label = { Text(filter) },
           )
         }
@@ -132,35 +160,35 @@ fun StreamSelectionSheet(
         Box(
           modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp),
+            .height(220.dp),
           contentAlignment = Alignment.Center,
         ) {
           Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Searching stream resolvers...")
+            Text("Resolving streams from active addons...", style = MaterialTheme.typography.bodyMedium)
           }
         }
       } else if (filteredStreams.isEmpty()) {
         Box(
           modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp),
+            .height(180.dp),
           contentAlignment = Alignment.Center,
         ) {
           Text(
-            text = "No streams available for selected filter.",
+            text = "No stream links found for selected filters.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
       } else {
         LazyColumn(
-          verticalArrangement = Arrangement.spacedBy(10.dp),
-          modifier = Modifier.height(360.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+          modifier = Modifier.height(420.dp),
         ) {
           items(filteredStreams) { stream ->
-            StreamItemCard(
+            RichStreamItemCard(
               stream = stream,
               onClick = { onStreamSelected(stream) },
             )
@@ -172,37 +200,40 @@ fun StreamSelectionSheet(
 }
 
 @Composable
-private fun StreamItemCard(
+private fun RichStreamItemCard(
   stream: StremioStream,
   onClick: () -> Unit,
 ) {
   Card(
     modifier = Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(12.dp))
+      .clip(RoundedCornerShape(14.dp))
       .clickable(onClick = onClick),
-    shape = RoundedCornerShape(12.dp),
+    shape = RoundedCornerShape(14.dp),
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+      containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ),
+    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
         .padding(14.dp),
-      verticalAlignment = Alignment.CenterVertically,
+      verticalAlignment = Alignment.Top,
     ) {
+      // Play Button Circle
       Box(
         modifier = Modifier
-          .size(40.dp)
+          .size(42.dp)
           .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.primaryContainer),
+          .background(Color(0xFF2E7D32)),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
           Icons.RoundedFilled.PlayArrow,
           contentDescription = null,
-          tint = MaterialTheme.colorScheme.onPrimaryContainer,
+          tint = Color.White,
+          modifier = Modifier.size(24.dp),
         )
       }
 
@@ -211,53 +242,52 @@ private fun StreamItemCard(
       Column(
         modifier = Modifier.weight(1f),
       ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+        // Stream Header / Addon Title
+        val streamHeader = buildString {
           if (!stream.addonName.isNullOrBlank()) {
-            Surface(
-              shape = RoundedCornerShape(4.dp),
-              color = MaterialTheme.colorScheme.secondaryContainer,
-            ) {
-              Text(
-                text = stream.addonName,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-              )
-            }
+            append("[${stream.addonName}] ")
           }
-
-          val displayTag = stream.name ?: if (stream.isTorrent) "P2P Torrent" else "Direct Stream"
-          Text(
-            text = displayTag,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-          )
+          val mainName = stream.name?.replace("\n", " ")?.trim()
+          if (!mainName.isNullOrBlank()) {
+            append(mainName)
+          } else if (stream.isTorrent) {
+            append("Torrent P2P Stream")
+          } else {
+            append("Direct Video Stream")
+          }
         }
 
-        if (!stream.title.isNullOrBlank()) {
-          Spacer(modifier = Modifier.height(2.dp))
-          Text(
-            text = stream.title,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-          )
+        Text(
+          text = streamHeader,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.primary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Render multi-line stream title / details cleanly
+        val titleText = stream.title
+        if (!titleText.isNullOrBlank()) {
+          val lines = titleText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+          for (line in lines) {
+            Text(
+              text = line,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurface,
+            )
+          }
         }
 
-        if (!stream.description.isNullOrBlank()) {
+        val descText = stream.description
+        if (!descText.isNullOrBlank()) {
           Spacer(modifier = Modifier.height(2.dp))
           Text(
-            text = stream.description,
+            text = descText,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
           )
         }
       }

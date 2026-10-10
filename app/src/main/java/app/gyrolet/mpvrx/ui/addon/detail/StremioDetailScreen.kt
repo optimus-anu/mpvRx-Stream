@@ -35,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -75,7 +76,10 @@ data class StremioDetailScreen(
   @OptIn(ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
-    val viewModel: StremioDetailViewModel = koinViewModel(parameters = { parametersOf(metaId, type) })
+    val viewModel: StremioDetailViewModel = koinViewModel(
+      key = "${metaId}_${type}",
+      parameters = { parametersOf(metaId, type) },
+    )
     val backStack = LocalBackStack.current
     val context = LocalContext.current
 
@@ -86,6 +90,7 @@ data class StremioDetailScreen(
     val isLoadingStreams by viewModel.isLoadingStreams.collectAsState()
     val showStreamSheet by viewModel.showStreamSheet.collectAsState()
     val currentStreamTitle by viewModel.currentStreamTitle.collectAsState()
+    val seriesHistory by viewModel.seriesHistory.collectAsState()
 
     if (showStreamSheet) {
       StreamSelectionSheet(
@@ -134,6 +139,8 @@ data class StremioDetailScreen(
         }
       } else {
         val currentMeta = meta!!
+        val actualType = if (currentMeta.type.isNotBlank()) currentMeta.type else type
+
         LazyColumn(
           modifier = Modifier
             .fillMaxSize()
@@ -262,8 +269,8 @@ data class StremioDetailScreen(
             }
           }
 
-          // Movie Play Button
-          if (type == "movie") {
+          // Movie Play Button (only if not series)
+          if (actualType == "movie" && currentMeta.videos.isNullOrEmpty()) {
             item {
               Box(
                 modifier = Modifier
@@ -320,7 +327,7 @@ data class StremioDetailScreen(
 
           // Series Season & Episode Picker
           val videosList = currentMeta.videos
-          if (type == "series" && !videosList.isNullOrEmpty()) {
+          if ((actualType == "series" || !videosList.isNullOrEmpty()) && !videosList.isNullOrEmpty()) {
             val seasons = videosList
               .mapNotNull { it.season }
               .distinct()
@@ -358,11 +365,20 @@ data class StremioDetailScreen(
               .sortedBy { it.episode ?: 0 }
 
             items(seasonVideos, key = { it.id }) { video ->
+              val epHistory = seriesHistory.find { history ->
+                history.mediaId == video.id ||
+                  (history.season == video.season && history.episode == video.episode)
+              }
+              val progressRatio = epHistory?.progressRatio ?: 0f
+              val isWatched = epHistory?.isFinished == true || progressRatio >= 0.9f
+
               EpisodeItemCard(
                 video = video,
+                progressRatio = progressRatio,
+                isWatched = isWatched,
                 onClick = {
-                  val epTitle = "${currentMeta.name} S${video.season ?: 1}E${video.episode ?: 1} ${video.title ?: ""}".trim()
-                  viewModel.openStreamsForMedia(epTitle, video.id)
+                  val epTitle = "${currentMeta.name} S${video.season ?: 1}E${video.episode ?: 1} - ${video.title ?: ""}".trim()
+                  viewModel.openStreamsForMedia(epTitle, video.id, video = video)
                 },
               )
             }
@@ -380,6 +396,8 @@ data class StremioDetailScreen(
 @Composable
 private fun EpisodeItemCard(
   video: StremioVideo,
+  progressRatio: Float = 0f,
+  isWatched: Boolean = false,
   onClick: () -> Unit,
 ) {
   Card(
@@ -421,6 +439,36 @@ private fun EpisodeItemCard(
           tint = Color.White,
           modifier = Modifier.size(24.dp),
         )
+
+        // Watched Eye Badge (top-right)
+        if (isWatched) {
+          Surface(
+            modifier = Modifier
+              .align(Alignment.TopEnd)
+              .padding(4.dp),
+            shape = RoundedCornerShape(4.dp),
+            color = Color(0xFFFFC107), // Yellow badge
+          ) {
+            Text(
+              text = "👁",
+              fontSize = 10.sp,
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            )
+          }
+        }
+
+        // Progress Bar (bottom)
+        if (progressRatio > 0f) {
+          LinearProgressIndicator(
+            progress = { progressRatio },
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(3.dp)
+              .align(Alignment.BottomCenter),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = Color.Black.copy(alpha = 0.5f),
+          )
+        }
       }
 
       Spacer(modifier = Modifier.width(12.dp))
@@ -433,6 +481,15 @@ private fun EpisodeItemCard(
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
+
+        if (!video.released.isNullOrBlank()) {
+          Spacer(modifier = Modifier.height(2.dp))
+          Text(
+            text = video.released,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+          )
+        }
 
         if (!video.overview.isNullOrBlank()) {
           Spacer(modifier = Modifier.height(2.dp))

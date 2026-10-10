@@ -12,11 +12,15 @@ package app.gyrolet.mpvrx.ui.addon.discover
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gyrolet.mpvrx.data.addon.AddonManager
+import app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker
+import app.gyrolet.mpvrx.database.entities.StremioPlaybackHistoryEntity
 import app.gyrolet.mpvrx.domain.addon.model.StremioMeta
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class CatalogRowState(
@@ -30,7 +34,15 @@ data class CatalogRowState(
 
 class AddonDiscoverViewModel(
   private val addonManager: AddonManager,
+  private val playbackTracker: StremioPlaybackTracker,
 ) : ViewModel() {
+
+  val continueWatching: StateFlow<List<StremioPlaybackHistoryEntity>> =
+    playbackTracker.continueWatching.stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.WhileSubscribed(5000),
+      initialValue = emptyList(),
+    )
 
   private val _searchQuery = MutableStateFlow("")
   val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
