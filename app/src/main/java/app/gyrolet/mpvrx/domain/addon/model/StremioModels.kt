@@ -143,7 +143,7 @@ data class StremioCatalog(
   val type: String,
   val id: String,
   val name: String? = null,
-  val extra: List<StremioExtra> = emptyList(),
+  val extra: List<StremioExtra>? = null,
   val extraSupported: List<String>? = null,
   val extraRequired: List<String>? = null,
 )

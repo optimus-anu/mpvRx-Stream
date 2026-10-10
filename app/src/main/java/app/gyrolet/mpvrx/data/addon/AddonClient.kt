@@ -9,6 +9,7 @@
 
 package app.gyrolet.mpvrx.data.addon
 
+import android.util.Log
 import app.gyrolet.mpvrx.domain.addon.model.StremioManifest
 import app.gyrolet.mpvrx.domain.addon.model.StremioMeta
 import app.gyrolet.mpvrx.domain.addon.model.StremioMetaDetailResponse
@@ -34,14 +35,15 @@ open class AddonClient(
   },
 ) {
   private val client: OkHttpClient = okHttpClient.newBuilder()
-    .connectTimeout(10, TimeUnit.SECONDS)
+    .connectTimeout(12, TimeUnit.SECONDS)
     .readTimeout(15, TimeUnit.SECONDS)
     .writeTimeout(15, TimeUnit.SECONDS)
     .followRedirects(true)
     .build()
 
   companion object {
-    private const val USER_AGENT = "mpvRx Stremio Addon Engine/1.0"
+    private const val TAG = "AddonClient"
+    private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Stremio/4.4"
   }
 
   /**
@@ -60,7 +62,8 @@ open class AddonClient(
       val response = client.newCall(request).awaitResponse()
       response.use { resp ->
         if (!resp.isSuccessful) {
-          return Result.failure(IOException("Failed to fetch manifest ($manifestUrl): HTTP ${resp.code} ${resp.message}"))
+          Log.e(TAG, "HTTP error fetching manifest ($manifestUrl): ${resp.code} ${resp.message}")
+          return Result.failure(IOException("Failed to fetch manifest: HTTP ${resp.code} ${resp.message}"))
         }
         val body = resp.body.string()
         if (body.isBlank()) {
@@ -72,6 +75,7 @@ open class AddonClient(
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
+      Log.e(TAG, "Error fetching/parsing manifest from $manifestUrl", e)
       Result.failure(e)
     }
   }
@@ -109,6 +113,7 @@ open class AddonClient(
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
+      Log.e(TAG, "Error fetching catalog from $catalogUrl", e)
       Result.failure(e)
     }
   }
@@ -147,6 +152,7 @@ open class AddonClient(
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
+      Log.e(TAG, "Error fetching meta from $metaUrl", e)
       Result.failure(e)
     }
   }
@@ -183,6 +189,7 @@ open class AddonClient(
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {
+      Log.e(TAG, "Error fetching streams from $streamUrl", e)
       Result.failure(e)
     }
   }
