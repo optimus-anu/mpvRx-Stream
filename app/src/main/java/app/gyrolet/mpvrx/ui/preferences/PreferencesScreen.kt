@@ -299,6 +299,25 @@ object PreferencesScreen : Screen {
           ),
       ),
       SettingsSection(
+        title = "Addons & Services",
+        tint = colorScheme.onSurfaceVariant,
+        items =
+          listOf(
+            SettingsDestination(
+              title = "Stremio Discover",
+              summary = "Browse movies, TV series, and search catalogs across installed addons",
+              icon = Icons.RoundedFilled.Explore,
+              screen = app.gyrolet.mpvrx.ui.addon.discover.AddonDiscoverScreen,
+            ),
+            SettingsDestination(
+              title = "Stremio Addons",
+              summary = "Install, configure, enable, or remove Stremio-compatible addons",
+              icon = Icons.RoundedFilled.Extension,
+              screen = app.gyrolet.mpvrx.ui.addon.management.AddonManagementScreen,
+            ),
+          ),
+      ),
+      SettingsSection(
         title = stringResource(R.string.pref_section_storage),
         tint = colorScheme.onSurfaceVariant,
         items =

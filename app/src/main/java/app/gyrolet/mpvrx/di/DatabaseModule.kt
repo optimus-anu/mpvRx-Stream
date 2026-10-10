@@ -1037,6 +1037,8 @@ val DatabaseModule =
           MIGRATION_28_29,
           MIGRATION_29_30,
           MIGRATION_30_31,
+          app.gyrolet.mpvrx.database.MIGRATION_31_32,
+          app.gyrolet.mpvrx.database.MIGRATION_32_33,
         ).build()
     }
 

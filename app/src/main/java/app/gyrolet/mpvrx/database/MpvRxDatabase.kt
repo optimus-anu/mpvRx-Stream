@@ -30,6 +30,8 @@ import app.gyrolet.mpvrx.database.dao.SnapshotFolderDao
 import app.gyrolet.mpvrx.database.dao.VideoMetadataDao
 import app.gyrolet.mpvrx.database.dao.JellyfinServerDao
 import app.gyrolet.mpvrx.database.dao.NavidromeServerDao
+import app.gyrolet.mpvrx.database.dao.StremioAddonDao
+import app.gyrolet.mpvrx.database.dao.StremioPlaybackHistoryDao
 import app.gyrolet.mpvrx.database.entities.AudiobookshelfServerEntity
 import app.gyrolet.mpvrx.database.entities.DirectoryScanEntity
 import app.gyrolet.mpvrx.database.entities.AudiobookEntity
@@ -47,6 +49,8 @@ import app.gyrolet.mpvrx.database.entities.PlaylistItemEntity
 import app.gyrolet.mpvrx.database.entities.RecentlyPlayedEntity
 import app.gyrolet.mpvrx.database.entities.SecureMediaEntity
 import app.gyrolet.mpvrx.database.entities.SnapshotFolderEntity
+import app.gyrolet.mpvrx.database.entities.StremioAddonEntity
+import app.gyrolet.mpvrx.database.entities.StremioPlaybackHistoryEntity
 import app.gyrolet.mpvrx.database.entities.VideoMetadataEntity
 import app.gyrolet.mpvrx.domain.network.NetworkConnection
 
@@ -71,8 +75,10 @@ import app.gyrolet.mpvrx.domain.network.NetworkConnection
     AudiobookshelfServerEntity::class,
     FrameCaptureEntity::class,
     SnapshotFolderEntity::class,
+    StremioAddonEntity::class,
+    StremioPlaybackHistoryEntity::class,
   ],
-  version = 31,
+  version = 33,
   exportSchema = true,
 )
 @TypeConverters(NetworkProtocolConverter::class, NetworkStreamEntryTypeConverter::class)
@@ -108,4 +114,8 @@ abstract class MpvRxDatabase : RoomDatabase() {
   abstract fun frameCaptureDao(): FrameCaptureDao
 
   abstract fun snapshotFolderDao(): SnapshotFolderDao
+
+  abstract fun stremioAddonDao(): StremioAddonDao
+
+  abstract fun stremioPlaybackHistoryDao(): StremioPlaybackHistoryDao
 }

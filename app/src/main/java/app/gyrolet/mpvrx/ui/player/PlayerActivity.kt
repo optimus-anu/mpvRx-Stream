@@ -232,6 +232,8 @@ class PlayerActivity :
 
   private val torrentStreamingEngine: TorrentStreamingEngine by inject()
 
+  private val stremioPlaybackTracker: app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker by inject()
+
   private val networkStreamEntryRepository: NetworkStreamEntryRepository by inject()
 
   private val networkHttpClient: OkHttpClient by inject()
@@ -1658,6 +1660,7 @@ class PlayerActivity :
       if (playbackWasInitialized && ownsPlaybackSession && !scriptRuntimeRestartPending) saveVideoPlaybackState(fileName, immediate = true)
       if (playbackWasInitialized && ownsPlaybackSession && !keepBackgroundPlaybackAlive) {
         reportJellyfinStop()
+        reportStremioStop()
       }
 
       if ((isUserFinishing || isFinishing || scriptRuntimeRestartPending) && !keepBackgroundPlaybackAlive) {
@@ -1946,6 +1949,7 @@ class PlayerActivity :
 
       if (!isBackgroundPlaybackSessionActive) {
         reportJellyfinStop()
+        reportStremioStop()
       }
       setReturnIntent()
     }.onFailure { e ->
@@ -4559,6 +4563,16 @@ class PlayerActivity :
       startJellyfinProgressLoop()
     }
 
+    if (app.gyrolet.mpvrx.ui.addon.StremioPlayerBridge.isStremioLaunch(intent)) {
+      app.gyrolet.mpvrx.ui.addon.StremioPlayerBridge.startProgressLoop(
+        scope = lifecycleScope,
+        intent = intent,
+        stremioPlaybackTracker = stremioPlaybackTracker,
+        readMpvIntSeconds = ::readMpvIntSeconds,
+        fallbackTitle = ::getTitleForControls,
+      )
+    }
+
     // Reset AB loop values when video changes
     viewModel.clearABLoop()
 
@@ -5033,6 +5047,16 @@ class PlayerActivity :
       reporter.reportPlaybackStop(currentPosMs)
       jellyfinSessionReporter = null
     }
+  }
+
+  private fun reportStremioStop() {
+    app.gyrolet.mpvrx.ui.addon.StremioPlayerBridge.reportStop(
+      scope = lifecycleScope,
+      intent = intent,
+      stremioPlaybackTracker = stremioPlaybackTracker,
+      readMpvIntSeconds = ::readMpvIntSeconds,
+      fallbackTitle = ::getTitleForControls,
+    )
   }
 
   private fun capturePlaybackStateSnapshot(mediaTitle: String): PlaybackStateSnapshot? {

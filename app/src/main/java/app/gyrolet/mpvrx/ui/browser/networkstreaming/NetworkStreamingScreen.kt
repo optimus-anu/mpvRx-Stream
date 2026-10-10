@@ -543,6 +543,7 @@ object NetworkStreamingScreen : Screen {
                   )
                 },
                 onManageBookmarks = { backstack.navigateTo(NetworkBookmarksScreen) },
+                onOpenAddons = { backstack.navigateTo(app.gyrolet.mpvrx.ui.addon.discover.AddonDiscoverScreen) },
               )
             }
             NetworkTab.MEDIA -> {
@@ -775,6 +776,7 @@ private fun LocalNetworkContent(
   onAutoConnectChange: (NetworkConnection, Boolean) -> Unit,
   onOpenBookmark: (ResolvedNetworkFolderBookmark) -> Unit,
   onManageBookmarks: () -> Unit,
+  onOpenAddons: () -> Unit,
 ) {
   val navBarHeight = app.gyrolet.mpvrx.ui.browser.LocalNavigationBarHeight.current.takeIf { it > 0.dp } ?: 88.dp
   val bottomOverlayClearance = maxOf(navBarHeight, app.gyrolet.mpvrx.ui.browser.NavigationBarState.miniPlayerClearance)
@@ -783,6 +785,11 @@ private fun LocalNetworkContent(
     contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = bottomOverlayClearance + 16.dp),
     verticalArrangement = Arrangement.spacedBy(16.dp),
   ) {
+    // 0. Stremio Addons & Discover Card
+    item {
+      app.gyrolet.mpvrx.ui.addon.components.StremioAddonCard(onClick = onOpenAddons)
+    }
+
     // 1. Stream Link Section (URL input & recent streams with Save to Media action)
     item {
       StreamLinkSection(

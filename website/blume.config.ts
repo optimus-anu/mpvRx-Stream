@@ -3,16 +3,16 @@ import { defineConfig } from "blume";
 export default defineConfig({
   title: "mpvRx",
   description:
-    "A focused Android media player powered by mpv, with deep playback controls, libraries, streaming, subtitles, and scripting.",
+    "A focused Android media player powered by mpv, with deep playback controls, libraries, Stremio addons, streaming, subtitles, and scripting.",
   logo: {
     href: "/",
     image: "/images/icon.svg",
     text: "mpvRx",
   },
   banner: {
-    content: "mpvRx 2.5.0 is available",
+    content: "mpvRx with Stremio Addons is available",
     link: {
-      href: "https://github.com/Riteshp2001/mpvRx/releases/latest",
+      href: "https://github.com/optimus-anu/mpvRx-Stream/releases/latest",
       text: "View release",
     },
   },
@@ -22,10 +22,10 @@ export default defineConfig({
   navigation: {
     actions: [
       { href: "/docs", label: "Docs" },
-      { href: "https://github.com/Riteshp2001/mpvRx/releases", label: "Releases" },
+      { href: "https://github.com/optimus-anu/mpvRx-Stream/releases", label: "Releases" },
     ],
     cta: {
-      href: "https://github.com/Riteshp2001/mpvRx/releases/latest",
+      href: "https://github.com/optimus-anu/mpvRx-Stream/releases/latest",
       label: "Download",
     },
     repo: true,
@@ -43,15 +43,15 @@ export default defineConfig({
     llmsTxt: {
       enabled: true,
       details:
-        "mpvRx is an Android media player built on libmpv. Use these docs for installation, playback, libraries, streaming, configuration, and the Lua/JavaScript bridge.",
+        "mpvRx is an Android media player built on libmpv. Use these docs for installation, playback, libraries, Stremio addons, configuration, and the Lua/JavaScript bridge.",
     },
   },
   deployment: {
     output: "static",
   },
   github: {
-    owner: "Riteshp2001",
-    repo: "mpvRx",
+    owner: "optimus-anu",
+    repo: "mpvRx-Stream",
     branch: "master",
     dir: "website/content",
   },
@@ -66,7 +66,7 @@ export default defineConfig({
         muted: "#b8afd0",
       },
       titles: {
-        "/": "mpvRx - Android media, without the noise",
+        "/": "mpvRx - Android media player with Stremio Addons",
       },
     },
     software: {
@@ -75,7 +75,7 @@ export default defineConfig({
       name: "mpvRx",
       operatingSystem: "Android 8.0 and newer",
       price: 0,
-      sameAs: ["https://github.com/Riteshp2001/mpvRx"],
+      sameAs: ["https://github.com/optimus-anu/mpvRx-Stream"],
     },
   },
   theme: {
