@@ -14,6 +14,7 @@ import app.gyrolet.mpvrx.database.entities.StremioAddonEntity
 import app.gyrolet.mpvrx.domain.addon.model.StremioManifest
 import app.gyrolet.mpvrx.domain.addon.model.StremioMeta
 import app.gyrolet.mpvrx.domain.addon.model.StremioStream
+import app.gyrolet.mpvrx.preferences.preference.PreferenceStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -24,6 +25,7 @@ import kotlinx.serialization.json.Json
 class AddonManager(
   private val addonClient: AddonClient,
   private val addonRepository: AddonRepository,
+  private val preferenceStore: PreferenceStore? = null,
   private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
   companion object {
@@ -35,17 +37,22 @@ class AddonManager(
   val enabledAddons: Flow<List<StremioAddonEntity>> = addonRepository.enabledAddons
 
   /**
-   * Ensures official default metadata addon (Cinemeta) is installed if no addons exist.
+   * Ensures official default metadata addon (Cinemeta) is installed ONCE on first launch.
+   * Does not re-install if the user has intentionally deleted or disabled Cinemeta.
    */
   suspend fun ensureDefaultAddonsInstalled() {
     try {
-      val current = addonRepository.allAddons.first()
-      if (current.isEmpty()) {
-        Log.d(TAG, "No addons found in local database. Automatically installing Cinemeta...")
-        installAddon(CINEMETA_MANIFEST_URL)
+      val isInitialized = preferenceStore?.getBoolean("default_stremio_addons_initialized", false)?.get() ?: false
+      if (!isInitialized) {
+        Log.d(TAG, "First-time setup: automatically installing default Cinemeta addon...")
+        val current = addonRepository.allAddons.first()
+        if (current.none { it.id == "com.linvo.cinemeta" || it.manifestUrl.contains("cinemeta") }) {
+          installAddon(CINEMETA_MANIFEST_URL)
+        }
+        preferenceStore?.getBoolean("default_stremio_addons_initialized", false)?.set(true)
       }
     } catch (e: Exception) {
-      Log.e(TAG, "Error installing default Cinemeta addon", e)
+      Log.e(TAG, "Error performing initial Cinemeta installation", e)
     }
   }
 

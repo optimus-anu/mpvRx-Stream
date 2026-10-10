@@ -1246,6 +1246,7 @@ val DatabaseModule =
       app.gyrolet.mpvrx.data.addon.AddonManager(
         addonClient = get(),
         addonRepository = get(),
+        preferenceStore = get(),
         json = get(),
       )
     }
