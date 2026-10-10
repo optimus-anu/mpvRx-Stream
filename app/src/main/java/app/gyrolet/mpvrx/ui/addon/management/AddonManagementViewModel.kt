@@ -57,7 +57,11 @@ class AddonManagementViewModel(
       if (result.isSuccess) {
         _inputUrl.value = ""
       } else {
-        _errorMessage.value = result.exceptionOrNull()?.message ?: "Failed to install addon"
+        val ex = result.exceptionOrNull()
+        _errorMessage.value = ex?.localizedMessage?.ifBlank { null }
+          ?: ex?.message?.ifBlank { null }
+          ?: ex?.let { "${it.javaClass.simpleName}: ${it.cause?.message ?: "Unknown error"}" }
+          ?: "Failed to install addon"
       }
     }
   }

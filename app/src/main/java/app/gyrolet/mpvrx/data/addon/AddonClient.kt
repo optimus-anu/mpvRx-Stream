@@ -34,14 +34,15 @@ open class AddonClient(
   },
 ) {
   private val client: OkHttpClient = okHttpClient.newBuilder()
-    .connectTimeout(10, TimeUnit.SECONDS)
+    .connectTimeout(15, TimeUnit.SECONDS)
     .readTimeout(15, TimeUnit.SECONDS)
     .writeTimeout(15, TimeUnit.SECONDS)
     .followRedirects(true)
+    .followSslRedirects(true)
     .build()
 
   companion object {
-    private const val USER_AGENT = "mpvRx Stremio Addon Engine/1.0"
+    private const val USER_AGENT = "Stremio/4.4.168 (Android)"
   }
 
   /**

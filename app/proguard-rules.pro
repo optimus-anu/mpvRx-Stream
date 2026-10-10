@@ -82,6 +82,20 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
+# Keep kotlinx.serialization classes & generated serializers
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable *;
+    @kotlinx.serialization.SerialName *;
+}
+-keepclassmembers class * {
+    *** Companion;
+}
+-keepclassmembers class **$serializer {
+    *** INSTANCE;
+}
+-keep class app.gyrolet.mpvrx.domain.addon.model.** { *; }
+-keep class kotlinx.serialization.** { *; }
+
 # Keep serializable classes
 -keepclassmembers class * implements java.io.Serializable {
     static final long serialVersionUID;
