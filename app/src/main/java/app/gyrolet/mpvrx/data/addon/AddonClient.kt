@@ -18,6 +18,8 @@ import app.gyrolet.mpvrx.domain.addon.model.StremioStreamResponse
 import app.gyrolet.mpvrx.network.SharedHttpClient
 import app.gyrolet.mpvrx.network.awaitResponse
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -48,9 +50,9 @@ open class AddonClient(
   /**
    * Fetches and parses an addon manifest from a URL.
    */
-  open suspend fun fetchManifest(rawUrl: String): Result<StremioManifest> {
+  open suspend fun fetchManifest(rawUrl: String): Result<StremioManifest> = withContext(Dispatchers.IO) {
     val manifestUrl = AddonUrlUtils.normalizeManifestUrl(rawUrl)
-    return try {
+    try {
       val request = Request.Builder()
         .url(manifestUrl)
         .header("User-Agent", USER_AGENT)
@@ -61,11 +63,11 @@ open class AddonClient(
       val response = client.newCall(request).awaitResponse()
       response.use { resp ->
         if (!resp.isSuccessful) {
-          return Result.failure(IOException("Failed to fetch manifest ($manifestUrl): HTTP ${resp.code} ${resp.message}"))
+          return@withContext Result.failure(IOException("Failed to fetch manifest ($manifestUrl): HTTP ${resp.code} ${resp.message}"))
         }
         val body = resp.body.string()
         if (body.isBlank()) {
-          return Result.failure(IOException("Empty response body from manifest ($manifestUrl)"))
+          return@withContext Result.failure(IOException("Empty response body from manifest ($manifestUrl)"))
         }
         val manifest = json.decodeFromString<StremioManifest>(body)
         Result.success(manifest)
@@ -85,9 +87,9 @@ open class AddonClient(
     type: String,
     catalogId: String,
     extra: Map<String, String>? = null,
-  ): Result<List<StremioMeta>> {
+  ): Result<List<StremioMeta>> = withContext(Dispatchers.IO) {
     val catalogUrl = AddonUrlUtils.buildCatalogUrl(baseUrl, type, catalogId, extra)
-    return try {
+    try {
       val request = Request.Builder()
         .url(catalogUrl)
         .header("User-Agent", USER_AGENT)
@@ -98,11 +100,11 @@ open class AddonClient(
       val response = client.newCall(request).awaitResponse()
       response.use { resp ->
         if (!resp.isSuccessful) {
-          return Result.failure(IOException("Failed to fetch catalog ($catalogUrl): HTTP ${resp.code} ${resp.message}"))
+          return@withContext Result.failure(IOException("Failed to fetch catalog ($catalogUrl): HTTP ${resp.code} ${resp.message}"))
         }
         val body = resp.body.string()
         if (body.isBlank()) {
-          return Result.failure(IOException("Empty response body from catalog ($catalogUrl)"))
+          return@withContext Result.failure(IOException("Empty response body from catalog ($catalogUrl)"))
         }
         val responseData = json.decodeFromString<StremioMetaResponse>(body)
         Result.success(responseData.metas)
@@ -121,9 +123,9 @@ open class AddonClient(
     baseUrl: String,
     type: String,
     metaId: String,
-  ): Result<StremioMeta> {
+  ): Result<StremioMeta> = withContext(Dispatchers.IO) {
     val metaUrl = AddonUrlUtils.buildMetaUrl(baseUrl, type, metaId)
-    return try {
+    try {
       val request = Request.Builder()
         .url(metaUrl)
         .header("User-Agent", USER_AGENT)
@@ -134,15 +136,15 @@ open class AddonClient(
       val response = client.newCall(request).awaitResponse()
       response.use { resp ->
         if (!resp.isSuccessful) {
-          return Result.failure(IOException("Failed to fetch meta ($metaUrl): HTTP ${resp.code} ${resp.message}"))
+          return@withContext Result.failure(IOException("Failed to fetch meta ($metaUrl): HTTP ${resp.code} ${resp.message}"))
         }
         val body = resp.body.string()
         if (body.isBlank()) {
-          return Result.failure(IOException("Empty response body from meta ($metaUrl)"))
+          return@withContext Result.failure(IOException("Empty response body from meta ($metaUrl)"))
         }
         val responseData = json.decodeFromString<StremioMetaDetailResponse>(body)
         val meta = responseData.meta
-          ?: return Result.failure(IOException("No meta found in response from ($metaUrl)"))
+          ?: return@withContext Result.failure(IOException("No meta found in response from ($metaUrl)"))
         Result.success(meta)
       }
     } catch (e: CancellationException) {
@@ -159,9 +161,9 @@ open class AddonClient(
     baseUrl: String,
     type: String,
     streamId: String,
-  ): Result<List<StremioStream>> {
+  ): Result<List<StremioStream>> = withContext(Dispatchers.IO) {
     val streamUrl = AddonUrlUtils.buildStreamUrl(baseUrl, type, streamId)
-    return try {
+    try {
       val request = Request.Builder()
         .url(streamUrl)
         .header("User-Agent", USER_AGENT)
@@ -172,11 +174,11 @@ open class AddonClient(
       val response = client.newCall(request).awaitResponse()
       response.use { resp ->
         if (!resp.isSuccessful) {
-          return Result.failure(IOException("Failed to fetch streams ($streamUrl): HTTP ${resp.code} ${resp.message}"))
+          return@withContext Result.failure(IOException("Failed to fetch streams ($streamUrl): HTTP ${resp.code} ${resp.message}"))
         }
         val body = resp.body.string()
         if (body.isBlank()) {
-          return Result.failure(IOException("Empty response body from streams ($streamUrl)"))
+          return@withContext Result.failure(IOException("Empty response body from streams ($streamUrl)"))
         }
         val responseData = json.decodeFromString<StremioStreamResponse>(body)
         Result.success(responseData.streams)

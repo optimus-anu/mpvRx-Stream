@@ -15,11 +15,13 @@ import app.gyrolet.mpvrx.domain.addon.model.StremioManifest
 import app.gyrolet.mpvrx.domain.addon.model.StremioMeta
 import app.gyrolet.mpvrx.domain.addon.model.StremioStream
 import app.gyrolet.mpvrx.preferences.preference.PreferenceStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 
@@ -62,11 +64,11 @@ class AddonManager(
    * Installs an addon by its manifest URL.
    * Fetches and validates the manifest, then persists the installed addon in storage.
    */
-  suspend fun installAddon(rawManifestUrl: String): Result<StremioManifest> {
+  suspend fun installAddon(rawManifestUrl: String): Result<StremioManifest> = withContext(Dispatchers.IO) {
     val normalizedUrl = AddonUrlUtils.normalizeManifestUrl(rawManifestUrl)
     val manifestResult = addonClient.fetchManifest(normalizedUrl)
     if (manifestResult.isFailure) {
-      return manifestResult
+      return@withContext manifestResult
     }
 
     val manifest = manifestResult.getOrThrow()
@@ -87,7 +89,7 @@ class AddonManager(
     )
 
     addonRepository.saveAddon(entity)
-    return Result.success(manifest)
+    Result.success(manifest)
   }
 
   /**
