@@ -787,58 +787,7 @@ private fun LocalNetworkContent(
   ) {
     // 0. Stremio Addons & Discover Card
     item {
-      Card(
-        modifier = Modifier
-          .fillMaxWidth()
-          .clip(RoundedCornerShape(16.dp))
-          .clickable { onOpenAddons() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-          containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-        ),
-      ) {
-        Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Box(
-            modifier = Modifier
-              .size(44.dp)
-              .clip(androidx.compose.foundation.shape.CircleShape)
-              .background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center,
-          ) {
-            Icon(
-              Icons.RoundedFilled.Extension,
-              contentDescription = null,
-              tint = MaterialTheme.colorScheme.onPrimary,
-            )
-          }
-
-          Spacer(modifier = Modifier.padding(start = 16.dp))
-
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = "Stremio Addons & Discover",
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.Bold,
-            )
-            Text(
-              text = "Browse catalogs, search movies & series, resolve streams",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-
-          Icon(
-            Icons.RoundedFilled.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-      }
+      app.gyrolet.mpvrx.ui.addon.components.StremioAddonCard(onClick = onOpenAddons)
     }
 
     // 1. Stream Link Section (URL input & recent streams with Save to Media action)

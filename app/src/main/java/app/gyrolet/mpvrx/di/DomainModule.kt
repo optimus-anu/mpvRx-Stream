@@ -96,9 +96,4 @@ val domainModule =
     single { app.gyrolet.mpvrx.repository.lyrics.LyricsRepository(androidContext(), get(), get()) }
     single { TorrentStreamingEngine(androidContext()) }
     single { app.gyrolet.mpvrx.repository.SeerrRepository(get(), get(), get()) }
-    single { app.gyrolet.mpvrx.data.debrid.RealDebridResolver(get(), get()) }
-    single { app.gyrolet.mpvrx.data.debrid.TorBoxResolver(get(), get()) }
-    single { app.gyrolet.mpvrx.data.debrid.AllDebridResolver(get(), get()) }
-    single { app.gyrolet.mpvrx.data.debrid.DebridService(get(), get(), get(), get()) }
-    single { app.gyrolet.mpvrx.domain.stream.StreamEngine(get()) }
   }

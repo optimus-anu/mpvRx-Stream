@@ -4563,8 +4563,14 @@ class PlayerActivity :
       startJellyfinProgressLoop()
     }
 
-    if (intent.getStringExtra("launch_source") == "stremio_addon") {
-      startStremioProgressLoop()
+    if (app.gyrolet.mpvrx.ui.addon.StremioPlayerBridge.isStremioLaunch(intent)) {
+      app.gyrolet.mpvrx.ui.addon.StremioPlayerBridge.startProgressLoop(
+        scope = lifecycleScope,
+        intent = intent,
+        stremioPlaybackTracker = stremioPlaybackTracker,
+        readMpvIntSeconds = ::readMpvIntSeconds,
+        fallbackTitle = ::getTitleForControls,
+      )
     }
 
     // Reset AB loop values when video changes
@@ -5043,76 +5049,14 @@ class PlayerActivity :
     }
   }
 
-  private var stremioProgressJob: Job? = null
-
-  private fun startStremioProgressLoop() {
-    val mediaId = intent.getStringExtra("stremio_media_id") ?: return
-    val type = intent.getStringExtra("stremio_type") ?: "movie"
-    val seriesId = intent.getStringExtra("stremio_series_id")
-    val season = intent.getIntExtra("stremio_season", -1).takeIf { it != -1 }
-    val episode = intent.getIntExtra("stremio_episode", -1).takeIf { it != -1 }
-    val title = intent.getStringExtra("stremio_title") ?: getTitleForControls()
-    val episodeTitle = intent.getStringExtra("stremio_episode_title")
-    val posterUrl = intent.getStringExtra("stremio_poster_url")
-    val bannerUrl = intent.getStringExtra("stremio_banner_url")
-
-    stremioProgressJob?.cancel()
-    stremioProgressJob = lifecycleScope.launch {
-      while (isActive) {
-        delay(5000)
-        val posMs = (readMpvIntSeconds("time-pos", viewModel.pos ?: 0).toLong() * 1000L).coerceAtLeast(0L)
-        val durMs = (readMpvIntSeconds("duration", viewModel.duration ?: 0).toLong() * 1000L).coerceAtLeast(0L)
-
-        if (posMs > 0) {
-          stremioPlaybackTracker.saveProgress(
-            mediaId = mediaId,
-            type = type,
-            seriesId = seriesId,
-            season = season,
-            episode = episode,
-            title = title,
-            episodeTitle = episodeTitle,
-            posterUrl = posterUrl,
-            bannerUrl = bannerUrl,
-            positionMs = posMs,
-            durationMs = durMs,
-          )
-        }
-      }
-    }
-  }
-
   private fun reportStremioStop() {
-    stremioProgressJob?.cancel()
-    stremioProgressJob = null
-    val mediaId = intent.getStringExtra("stremio_media_id") ?: return
-    val type = intent.getStringExtra("stremio_type") ?: "movie"
-    val seriesId = intent.getStringExtra("stremio_series_id")
-    val season = intent.getIntExtra("stremio_season", -1).takeIf { it != -1 }
-    val episode = intent.getIntExtra("stremio_episode", -1).takeIf { it != -1 }
-    val title = intent.getStringExtra("stremio_title") ?: getTitleForControls()
-    val episodeTitle = intent.getStringExtra("stremio_episode_title")
-    val posterUrl = intent.getStringExtra("stremio_poster_url")
-    val bannerUrl = intent.getStringExtra("stremio_banner_url")
-
-    val posMs = (readMpvIntSeconds("time-pos", viewModel.pos ?: 0).toLong() * 1000L).coerceAtLeast(0L)
-    val durMs = (readMpvIntSeconds("duration", viewModel.duration ?: 0).toLong() * 1000L).coerceAtLeast(0L)
-
-    if (posMs > 0) {
-      stremioPlaybackTracker.saveProgress(
-        mediaId = mediaId,
-        type = type,
-        seriesId = seriesId,
-        season = season,
-        episode = episode,
-        title = title,
-        episodeTitle = episodeTitle,
-        posterUrl = posterUrl,
-        bannerUrl = bannerUrl,
-        positionMs = posMs,
-        durationMs = durMs,
-      )
-    }
+    app.gyrolet.mpvrx.ui.addon.StremioPlayerBridge.reportStop(
+      scope = lifecycleScope,
+      intent = intent,
+      stremioPlaybackTracker = stremioPlaybackTracker,
+      readMpvIntSeconds = ::readMpvIntSeconds,
+      fallbackTitle = ::getTitleForControls,
+    )
   }
 
   private fun capturePlaybackStateSnapshot(mediaTitle: String): PlaybackStateSnapshot? {
