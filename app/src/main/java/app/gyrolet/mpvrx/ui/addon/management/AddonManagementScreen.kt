@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -65,8 +67,23 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 
+data class QuickAddonPreset(
+  val name: String,
+  val url: String,
+  val category: String,
+)
+
 @Serializable
 object AddonManagementScreen : Screen {
+
+  private val popularPresets = listOf(
+    QuickAddonPreset("AIOMetadata", "https://aiometadata.org/manifest.json", "Catalog"),
+    QuickAddonPreset("CyberFlix", "https://cyberflix.strem.fun/manifest.json", "Catalog"),
+    QuickAddonPreset("TMDB Addon", "https://tmdb-addon.strem.fun/manifest.json", "Catalog"),
+    QuickAddonPreset("Anime Kitsu", "https://v3-kitsu.strem.io/manifest.json", "Anime"),
+    QuickAddonPreset("Torrentio", "https://torrentio.strem.fun/manifest.json", "Streams"),
+    QuickAddonPreset("Cinemeta", "https://v3-cinemeta.strem.io/manifest.json", "Catalog"),
+  )
 
   @OptIn(ExperimentalMaterial3Api::class)
   @Composable
@@ -184,6 +201,32 @@ object AddonManagementScreen : Screen {
           }
         }
 
+        // Quick Install Presets
+        item {
+          Column {
+            Text(
+              text = "Popular Addons Quick-Install",
+              style = MaterialTheme.typography.titleSmall,
+              fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+              items(popularPresets) { preset ->
+                FilterChip(
+                  selected = false,
+                  onClick = {
+                    viewModel.onInputUrlChanged(preset.url)
+                    viewModel.installAddon()
+                  },
+                  label = { Text("+ ${preset.name}") },
+                )
+              }
+            }
+          }
+        }
+
         // Section 2: Installed Addons Header
         item {
           Row(
@@ -209,7 +252,7 @@ object AddonManagementScreen : Screen {
               contentAlignment = Alignment.Center,
             ) {
               Text(
-                text = "No addons installed yet. Paste a manifest URL above to get started.",
+                text = "No addons installed yet. Tap a popular addon above or paste a manifest URL.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )

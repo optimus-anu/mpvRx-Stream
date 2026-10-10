@@ -88,30 +88,17 @@ class AddonDiscoverViewModel(
   fun loadCatalogs() {
     viewModelScope.launch {
       _isLoadingCatalogs.value = true
-      addonManager.ensureDefaultAddonsInstalled()
+      val groups = addonManager.queryAllCatalogs()
 
-      val defaultCatalogs = listOf(
-        Pair("movie", "top"),
-        Pair("series", "top"),
-      )
-
-      val rows = mutableListOf<CatalogRowState>()
-
-      for ((type, catalogId) in defaultCatalogs) {
-        val items = addonManager.queryCatalogs(type, catalogId)
-        if (items.isNotEmpty()) {
-          val title = if (type == "movie") "Popular Movies" else "Popular TV Shows"
-          rows.add(
-            CatalogRowState(
-              addonName = "Cinemeta",
-              catalogTitle = title,
-              type = type,
-              catalogId = catalogId,
-              items = items,
-              isLoading = false,
-            )
-          )
-        }
+      val rows = groups.map { group ->
+        CatalogRowState(
+          addonName = group.addonName,
+          catalogTitle = group.catalogTitle,
+          type = group.type,
+          catalogId = group.catalogId,
+          items = group.items,
+          isLoading = false,
+        )
       }
 
       _catalogRows.value = rows
@@ -122,12 +109,15 @@ class AddonDiscoverViewModel(
   private fun performSearch(query: String) {
     viewModelScope.launch {
       _isSearching.value = true
-      val movieResults = addonManager.queryCatalogs("movie", "top", mapOf("search" to query))
-      val seriesResults = addonManager.queryCatalogs("series", "top", mapOf("search" to query))
+      val allResults = addonManager.querySearchAll(query)
 
-      _searchMovieResults.value = movieResults.distinctBy { it.id }
-      _searchSeriesResults.value = seriesResults.distinctBy { it.id }
-      _searchResults.value = (movieResults + seriesResults).distinctBy { it.id }
+      val movieResults = allResults.filter { it.type == "movie" }
+      val seriesResults = allResults.filter { it.type == "series" }
+      val otherResults = allResults.filter { it.type != "movie" && it.type != "series" }
+
+      _searchMovieResults.value = movieResults
+      _searchSeriesResults.value = seriesResults.ifEmpty { otherResults }
+      _searchResults.value = allResults
       _isSearching.value = false
     }
   }

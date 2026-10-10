@@ -38,7 +38,7 @@ val addonModule = module {
   // Repositories & Services
   single { AddonClient(okHttpClient = get(), json = get()) }
   single { AddonRepository(addonDao = get()) }
-  single { AddonManager(addonClient = get(), addonRepository = get(), preferenceStore = get(), json = get()) }
+  single { AddonManager(addonClient = get(), addonRepository = get(), json = get()) }
   single { StremioPlaybackTracker(historyDao = get()) }
 
   // Debrid & Stream Engine

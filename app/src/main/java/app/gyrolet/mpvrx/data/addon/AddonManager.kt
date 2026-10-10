@@ -9,12 +9,10 @@
 
 package app.gyrolet.mpvrx.data.addon
 
-import android.util.Log
 import app.gyrolet.mpvrx.database.entities.StremioAddonEntity
 import app.gyrolet.mpvrx.domain.addon.model.StremioManifest
 import app.gyrolet.mpvrx.domain.addon.model.StremioMeta
 import app.gyrolet.mpvrx.domain.addon.model.StremioStream
-import app.gyrolet.mpvrx.preferences.preference.PreferenceStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -23,40 +21,25 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 
+data class DynamicCatalogGroup(
+  val addonName: String,
+  val catalogTitle: String,
+  val type: String,
+  val catalogId: String,
+  val items: List<StremioMeta>,
+)
+
 class AddonManager(
   private val addonClient: AddonClient,
   private val addonRepository: AddonRepository,
-  private val preferenceStore: PreferenceStore? = null,
   private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
   companion object {
-    private const val TAG = "AddonManager"
-    const val CINEMETA_MANIFEST_URL = "https://v3-cinemeta.strem.io/manifest.json"
     private const val ADDON_QUERY_TIMEOUT_MS = 12_000L
   }
 
   val installedAddons: Flow<List<StremioAddonEntity>> = addonRepository.allAddons
   val enabledAddons: Flow<List<StremioAddonEntity>> = addonRepository.enabledAddons
-
-  /**
-   * Ensures official default metadata addon (Cinemeta) is installed ONCE on first launch.
-   * Does not re-install if the user has intentionally deleted or disabled Cinemeta.
-   */
-  suspend fun ensureDefaultAddonsInstalled() {
-    try {
-      val isInitialized = preferenceStore?.getBoolean("default_stremio_addons_initialized", false)?.get() ?: false
-      if (!isInitialized) {
-        Log.d(TAG, "First-time setup: automatically installing default Cinemeta addon...")
-        val current = addonRepository.allAddons.first()
-        if (current.none { it.id == "com.linvo.cinemeta" || it.manifestUrl.contains("cinemeta") }) {
-          installAddon(CINEMETA_MANIFEST_URL)
-        }
-        preferenceStore?.getBoolean("default_stremio_addons_initialized", false)?.set(true)
-      }
-    } catch (e: Exception) {
-      Log.e(TAG, "Error performing initial Cinemeta installation", e)
-    }
-  }
 
   /**
    * Installs an addon by its manifest URL.
@@ -118,60 +101,64 @@ class AddonManager(
   }
 
   /**
-   * Queries catalogs from all enabled installed addons supporting the requested catalog type and ID.
+   * Dynamically queries ALL catalogs across all enabled installed addons.
+   * Returns catalog groups representing rows for the Discover screen.
    */
-  suspend fun queryCatalogs(
-    type: String,
-    catalogId: String,
-    extra: Map<String, String>? = null,
-  ): List<StremioMeta> = coroutineScope {
+  suspend fun queryAllCatalogs(): List<DynamicCatalogGroup> = coroutineScope {
     val enabledList = addonRepository.enabledAddons.first()
-    val isSearch = extra?.containsKey("search") == true
+    val results = mutableListOf<DynamicCatalogGroup>()
 
-    val eligibleAddons = enabledList.filter { addonEntity ->
-      val manifest = getParsedManifest(addonEntity) ?: return@filter false
-      val hasCatalogResource = manifest.resources.any { res ->
-        res.name == "catalog" && res.supportsType(type)
-      }
-      if (!hasCatalogResource) return@filter false
+    for (addonEntity in enabledList) {
+      val manifest = getParsedManifest(addonEntity) ?: continue
+      val hasCatalogResource = manifest.resources.any { res -> res.name == "catalog" }
+      if (!hasCatalogResource) continue
 
-      if (isSearch) {
-        manifest.catalogs.any { cat ->
-          cat.type == type && (
-            cat.extra?.any { it.name == "search" } == true ||
-            cat.extraSupported?.contains("search") == true ||
-            cat.id == catalogId ||
-            cat.id == "top" ||
-            cat.id == "search"
-          )
+      for (catalog in manifest.catalogs) {
+        val rawTitle = catalog.name ?: catalog.id.replace("_", " ").replace("-", " ")
+        val formattedTitle = "${addonEntity.name} - ${rawTitle.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }}"
+
+        val deferred = async {
+          withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
+            val res = addonClient.fetchCatalog(addonEntity.baseUrl, catalog.type, catalog.id)
+            res.getOrDefault(emptyList())
+          } ?: emptyList()
         }
-      } else {
-        manifest.catalogs.any { cat ->
-          cat.type == type && cat.id == catalogId
+
+        val items = deferred.await()
+        if (items.isNotEmpty()) {
+          results.add(
+            DynamicCatalogGroup(
+              addonName = addonEntity.name,
+              catalogTitle = formattedTitle,
+              type = catalog.type,
+              catalogId = catalog.id,
+              items = items,
+            )
+          )
         }
       }
     }
 
-    val deferreds = eligibleAddons.flatMap { addon ->
-      val manifest = getParsedManifest(addon) ?: return@flatMap emptyList()
-      val matchingCatalogs = if (isSearch) {
-        manifest.catalogs.filter { cat ->
-          cat.type == type && (
-            cat.extra?.any { it.name == "search" } == true ||
-            cat.extraSupported?.contains("search") == true ||
-            cat.id == catalogId ||
-            cat.id == "top"
-          )
-        }.ifEmpty { manifest.catalogs.filter { it.type == type } }
-      } else {
-        manifest.catalogs.filter { cat -> cat.type == type && cat.id == catalogId }
-      }
+    results
+  }
 
-      matchingCatalogs.map { catalog ->
+  /**
+   * Queries catalog items for a search query across all enabled installed addons.
+   */
+  suspend fun querySearchAll(query: String): List<StremioMeta> = coroutineScope {
+    val enabledList = addonRepository.enabledAddons.first()
+    val searchExtra = mapOf("search" to query)
+
+    val deferreds = enabledList.flatMap { addon ->
+      val manifest = getParsedManifest(addon) ?: return@flatMap emptyList()
+      val hasCatalogResource = manifest.resources.any { res -> res.name == "catalog" }
+      if (!hasCatalogResource) return@flatMap emptyList()
+
+      manifest.catalogs.map { catalog ->
         async {
           withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
-            val result = addonClient.fetchCatalog(addon.baseUrl, type, catalog.id, extra)
-            result.getOrDefault(emptyList())
+            val res = addonClient.fetchCatalog(addon.baseUrl, catalog.type, catalog.id, searchExtra)
+            res.getOrDefault(emptyList())
           } ?: emptyList()
         }
       }
