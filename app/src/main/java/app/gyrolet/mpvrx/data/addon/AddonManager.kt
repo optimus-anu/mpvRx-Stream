@@ -18,6 +18,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 
@@ -32,10 +33,12 @@ data class DynamicCatalogGroup(
 class AddonManager(
   private val addonClient: AddonClient,
   private val addonRepository: AddonRepository,
+  private val catalogCache: StremioCatalogCache? = null,
   private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
   companion object {
     private const val ADDON_QUERY_TIMEOUT_MS = 12_000L
+    private const val CINEMETA_SEARCH_BASE_URL = "https://v3-cinemeta.strem.io"
   }
 
   val installedAddons: Flow<List<StremioAddonEntity>> = addonRepository.allAddons
@@ -100,50 +103,72 @@ class AddonManager(
     }
   }
 
+  fun getCachedCatalogGroups(): List<DynamicCatalogGroup> {
+    return catalogCache?.getAllCachedGroups() ?: emptyList()
+  }
+
   /**
-   * Dynamically queries ALL catalogs across all enabled installed addons.
-   * Returns catalog groups representing rows for the Discover screen.
+   * Progressive Flow stream that emits catalog rows immediately as each addon request resolves.
    */
-  suspend fun queryAllCatalogs(): List<DynamicCatalogGroup> = coroutineScope {
+  fun streamAllCatalogs(): Flow<DynamicCatalogGroup> = flow {
     val enabledList = addonRepository.enabledAddons.first()
-    val results = mutableListOf<DynamicCatalogGroup>()
 
     for (addonEntity in enabledList) {
       val manifest = getParsedManifest(addonEntity) ?: continue
       val hasCatalogResource = manifest.resources.any { res -> res.name == "catalog" }
       if (!hasCatalogResource) continue
 
-      for (catalog in manifest.catalogs) {
-        val rawTitle = catalog.name ?: catalog.id.replace("_", " ").replace("-", " ")
-        val formattedTitle = "${addonEntity.name} - ${rawTitle.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }}"
+      coroutineScope {
+        val jobs = manifest.catalogs.map { catalog ->
+          async {
+            val rawTitle = catalog.name ?: catalog.id.replace("_", " ").replace("-", " ")
+            val formattedTitle = "${addonEntity.name} - ${rawTitle.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }}"
 
-        val deferred = async {
-          withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
-            val res = addonClient.fetchCatalog(addonEntity.baseUrl, catalog.type, catalog.id)
-            res.getOrDefault(emptyList())
-          } ?: emptyList()
+            // Check cache first
+            val cachedItems = catalogCache?.get(addonEntity.name, catalog.id, catalog.type)
+            if (!cachedItems.isNullOrEmpty()) {
+              return@async DynamicCatalogGroup(
+                addonName = addonEntity.name,
+                catalogTitle = formattedTitle,
+                type = catalog.type,
+                catalogId = catalog.id,
+                items = cachedItems,
+              )
+            }
+
+            val items = withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
+              val res = addonClient.fetchCatalog(addonEntity.baseUrl, catalog.type, catalog.id)
+              res.getOrDefault(emptyList())
+            } ?: emptyList()
+
+            if (items.isNotEmpty()) {
+              catalogCache?.put(addonEntity.name, formattedTitle, catalog.id, catalog.type, items)
+              DynamicCatalogGroup(
+                addonName = addonEntity.name,
+                catalogTitle = formattedTitle,
+                type = catalog.type,
+                catalogId = catalog.id,
+                items = items,
+              )
+            } else {
+              null
+            }
+          }
         }
 
-        val items = deferred.await()
-        if (items.isNotEmpty()) {
-          results.add(
-            DynamicCatalogGroup(
-              addonName = addonEntity.name,
-              catalogTitle = formattedTitle,
-              type = catalog.type,
-              catalogId = catalog.id,
-              items = items,
-            )
-          )
+        for (job in jobs) {
+          val result = job.await()
+          if (result != null) {
+            emit(result)
+          }
         }
       }
     }
-
-    results
   }
 
   /**
    * Queries catalog items for a search query across all enabled installed addons.
+   * Automatically falls back to Cinemeta search if installed addons return zero search results or time out.
    */
   suspend fun querySearchAll(query: String): List<StremioMeta> = coroutineScope {
     val enabledList = addonRepository.enabledAddons.first()
@@ -154,7 +179,21 @@ class AddonManager(
       val hasCatalogResource = manifest.resources.any { res -> res.name == "catalog" }
       if (!hasCatalogResource) return@flatMap emptyList()
 
-      manifest.catalogs.map { catalog ->
+      val searchCatalogs = manifest.catalogs.filter { cat ->
+        cat.extra?.any { it.name == "search" } == true ||
+          cat.extraSupported?.contains("search") == true ||
+          cat.extraRequired?.contains("search") == true ||
+          cat.id == "top" ||
+          cat.id == "search" ||
+          cat.id.contains("popular") ||
+          cat.id.contains("movie") ||
+          cat.id.contains("series") ||
+          cat.id.contains("aio") ||
+          cat.id.contains("tmdb") ||
+          cat.id.contains("cyberflix")
+      }.ifEmpty { manifest.catalogs }
+
+      searchCatalogs.map { catalog ->
         async {
           withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
             val res = addonClient.fetchCatalog(addon.baseUrl, catalog.type, catalog.id, searchExtra)
@@ -164,7 +203,24 @@ class AddonManager(
       }
     }
 
-    deferreds.awaitAll().flatten().distinctBy { it.id }
+    val installedResults = deferreds.awaitAll().flatten().distinctBy { it.id }
+
+    if (installedResults.isNotEmpty()) {
+      installedResults
+    } else {
+      // Fallback to Cinemeta search if installed search addons returned 0 results or timed out
+      val fallbackMovie = async {
+        withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
+          addonClient.fetchCatalog(CINEMETA_SEARCH_BASE_URL, "movie", "top", searchExtra).getOrDefault(emptyList())
+        } ?: emptyList()
+      }
+      val fallbackSeries = async {
+        withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
+          addonClient.fetchCatalog(CINEMETA_SEARCH_BASE_URL, "series", "top", searchExtra).getOrDefault(emptyList())
+        } ?: emptyList()
+      }
+      (fallbackMovie.await() + fallbackSeries.await()).distinctBy { it.id }
+    }
   }
 
   /**

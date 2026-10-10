@@ -123,7 +123,7 @@ object StremioResourceListSerializer : KSerializer<List<StremioResource>> {
 @Immutable
 @Serializable(with = StremioResourceSerializer::class)
 data class StremioResource(
-  val name: String,
+  val name: String = "unknown",
   val types: List<String>? = null,
   val idPrefixes: List<String>? = null,
 ) {
@@ -140,8 +140,8 @@ data class StremioResource(
 @Immutable
 @Serializable
 data class StremioCatalog(
-  val type: String,
-  val id: String,
+  val type: String = "movie",
+  val id: String = "top",
   val name: String? = null,
   val extra: List<StremioExtra>? = null,
   val extraSupported: List<String>? = null,
@@ -151,7 +151,7 @@ data class StremioCatalog(
 @Immutable
 @Serializable
 data class StremioExtra(
-  val name: String,
+  val name: String = "",
   val isRequired: Boolean? = false,
   val options: List<String>? = null,
   val optionsLimit: Int? = null,
@@ -169,9 +169,9 @@ data class StremioManifestBehaviorHints(
 @Immutable
 @Serializable
 data class StremioManifest(
-  val id: String,
-  val version: String,
-  val name: String,
+  val id: String = "",
+  val version: String = "1.0.0",
+  val name: String = "Addon",
   val description: String? = null,
   @Serializable(with = StremioResourceListSerializer::class)
   val resources: List<StremioResource> = emptyList(),
@@ -197,9 +197,9 @@ data class StremioMetaDetailResponse(
 @Immutable
 @Serializable
 data class StremioMeta(
-  val id: String,
-  val type: String,
-  val name: String,
+  val id: String = "",
+  val type: String = "movie",
+  val name: String = "",
   val poster: String? = null,
   val posterShape: String? = null,
   val banner: String? = null,
@@ -225,7 +225,7 @@ data class StremioMeta(
 @Immutable
 @Serializable
 data class StremioVideo(
-  val id: String,
+  val id: String = "",
   val title: String? = null,
   val released: String? = null,
   val thumbnail: String? = null,
@@ -238,16 +238,16 @@ data class StremioVideo(
 @Immutable
 @Serializable
 data class StremioTrailer(
-  val source: String,
+  val source: String = "",
   val type: String? = "Trailer",
 )
 
 @Immutable
 @Serializable
 data class StremioMetaLink(
-  val name: String,
-  val category: String,
-  val url: String,
+  val name: String = "",
+  val category: String = "",
+  val url: String = "",
 )
 
 @Immutable
@@ -309,8 +309,8 @@ data class StremioStream(
 @Serializable
 data class StremioSubtitle(
   val id: String? = null,
-  val url: String,
-  val lang: String,
+  val url: String = "",
+  val lang: String = "",
 )
 
 @Immutable

@@ -315,6 +315,12 @@ object PreferencesScreen : Screen {
               icon = Icons.RoundedFilled.Extension,
               screen = app.gyrolet.mpvrx.ui.addon.management.AddonManagementScreen,
             ),
+            SettingsDestination(
+              title = "Debrid & TMDB Settings",
+              summary = "Configure custom TMDB search API key, Real-Debrid, TorBox, and AllDebrid tokens",
+              icon = Icons.RoundedFilled.Key,
+              screen = DebridPreferencesScreen,
+            ),
           ),
       ),
       SettingsSection(

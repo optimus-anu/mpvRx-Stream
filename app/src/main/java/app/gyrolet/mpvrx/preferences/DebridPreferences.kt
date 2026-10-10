@@ -27,4 +27,5 @@ class DebridPreferences(
   val torBoxApiKey = preferenceStore.getString("debrid_torbox_api_key", "")
   val allDebridApiKey = preferenceStore.getString("debrid_alldebrid_api_key", "")
   val enableDebrid = preferenceStore.getBoolean("debrid_enabled", true)
+  val tmdbApiKey = preferenceStore.getString("debrid_tmdb_api_key", "5b589fccce5bc58d331feb8fc1ccdfb2")
 }

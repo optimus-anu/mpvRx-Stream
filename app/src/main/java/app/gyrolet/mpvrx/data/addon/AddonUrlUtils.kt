@@ -98,7 +98,7 @@ object AddonUrlUtils {
     return "$cleanBase/stream/$encodedType/$encodedId.json"
   }
 
-  private fun encode(value: String): String {
+  fun encode(value: String): String {
     return try {
       URLEncoder.encode(value, "UTF-8")
         .replace("+", "%20")

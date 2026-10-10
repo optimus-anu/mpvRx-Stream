@@ -13,8 +13,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gyrolet.mpvrx.data.addon.AddonManager
 import app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker
+import app.gyrolet.mpvrx.data.addon.TmdbSearchClient
 import app.gyrolet.mpvrx.database.entities.StremioPlaybackHistoryEntity
 import app.gyrolet.mpvrx.domain.addon.model.StremioMeta
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +37,7 @@ data class CatalogRowState(
 class AddonDiscoverViewModel(
   private val addonManager: AddonManager,
   playbackTracker: StremioPlaybackTracker,
+  private val tmdbSearchClient: TmdbSearchClient,
 ) : ViewModel() {
 
   val continueWatching: StateFlow<List<StremioPlaybackHistoryEntity>> =
@@ -59,6 +62,9 @@ class AddonDiscoverViewModel(
   private val _searchSeriesResults = MutableStateFlow<List<StremioMeta>>(emptyList())
   val searchSeriesResults: StateFlow<List<StremioMeta>> = _searchSeriesResults.asStateFlow()
 
+  private val _searchOtherResults = MutableStateFlow<List<StremioMeta>>(emptyList())
+  val searchOtherResults: StateFlow<List<StremioMeta>> = _searchOtherResults.asStateFlow()
+
   private val _catalogRows = MutableStateFlow<List<CatalogRowState>>(emptyList())
   val catalogRows: StateFlow<List<CatalogRowState>> = _catalogRows.asStateFlow()
 
@@ -75,50 +81,90 @@ class AddonDiscoverViewModel(
 
   fun onSearchQueryChanged(query: String) {
     _searchQuery.value = query
-    if (query.isNotBlank()) {
-      performSearch(query)
-    } else {
+    if (query.isBlank()) {
       _searchResults.value = emptyList()
       _searchMovieResults.value = emptyList()
       _searchSeriesResults.value = emptyList()
+      _searchOtherResults.value = emptyList()
+      _isSearching.value = false
+    }
+  }
+
+  fun performSearch() {
+    val query = _searchQuery.value.trim()
+    if (query.isBlank()) return
+
+    viewModelScope.launch {
+      _isSearching.value = true
+
+      val tmdbDeferred = async { tmdbSearchClient.searchMulti(query).getOrDefault(emptyList()) }
+      val addonsDeferred = async { addonManager.querySearchAll(query) }
+
+      val tmdbResults = tmdbDeferred.await()
+      val addonResults = addonsDeferred.await()
+
+      val combined = (tmdbResults + addonResults).distinctBy { it.id }
+
+      val movieResults = combined.filter { it.type == "movie" || it.type.contains("movie") }
+      val seriesResults = combined.filter { it.type == "series" || it.type.contains("series") || it.type == "tv" }
+      val otherResults = combined.filter { it !in movieResults && it !in seriesResults }
+
+      _searchMovieResults.value = movieResults
+      _searchSeriesResults.value = seriesResults
+      _searchOtherResults.value = otherResults
+      _searchResults.value = combined
       _isSearching.value = false
     }
   }
 
   fun loadCatalogs() {
     viewModelScope.launch {
-      _isLoadingCatalogs.value = true
-      val groups = addonManager.queryAllCatalogs()
-
-      val rows = groups.map { group ->
-        CatalogRowState(
-          addonName = group.addonName,
-          catalogTitle = group.catalogTitle,
-          type = group.type,
-          catalogId = group.catalogId,
-          items = group.items,
-          isLoading = false,
-        )
+      // 1. Load cached rows immediately (<10ms)
+      val cached = addonManager.getCachedCatalogGroups()
+      if (cached.isNotEmpty()) {
+        _catalogRows.value = cached.map { group ->
+          CatalogRowState(
+            addonName = group.addonName,
+            catalogTitle = group.catalogTitle,
+            type = group.type,
+            catalogId = group.catalogId,
+            items = group.items,
+            isLoading = false,
+          )
+        }
+        _isLoadingCatalogs.value = false
+      } else {
+        _isLoadingCatalogs.value = true
       }
 
-      _catalogRows.value = rows
+      // 2. Stream fresh rows dynamically as each catalog resolves
+      val currentRows = _catalogRows.value.toMutableList()
+
+      addonManager.streamAllCatalogs().collect { newGroup ->
+        val newRow = CatalogRowState(
+          addonName = newGroup.addonName,
+          catalogTitle = newGroup.catalogTitle,
+          type = newGroup.type,
+          catalogId = newGroup.catalogId,
+          items = newGroup.items,
+          isLoading = false,
+        )
+
+        val existingIndex = currentRows.indexOfFirst {
+          it.addonName == newRow.addonName && it.catalogId == newRow.catalogId && it.type == newRow.type
+        }
+
+        if (existingIndex >= 0) {
+          currentRows[existingIndex] = newRow
+        } else {
+          currentRows.add(newRow)
+        }
+
+        _catalogRows.value = currentRows.toList()
+        _isLoadingCatalogs.value = false
+      }
+
       _isLoadingCatalogs.value = false
-    }
-  }
-
-  private fun performSearch(query: String) {
-    viewModelScope.launch {
-      _isSearching.value = true
-      val allResults = addonManager.querySearchAll(query)
-
-      val movieResults = allResults.filter { it.type == "movie" }
-      val seriesResults = allResults.filter { it.type == "series" }
-      val otherResults = allResults.filter { it.type != "movie" && it.type != "series" }
-
-      _searchMovieResults.value = movieResults
-      _searchSeriesResults.value = seriesResults.ifEmpty { otherResults }
-      _searchResults.value = allResults
-      _isSearching.value = false
     }
   }
 }

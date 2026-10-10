@@ -12,7 +12,9 @@ package app.gyrolet.mpvrx.di
 import app.gyrolet.mpvrx.data.addon.AddonClient
 import app.gyrolet.mpvrx.data.addon.AddonManager
 import app.gyrolet.mpvrx.data.addon.AddonRepository
+import app.gyrolet.mpvrx.data.addon.StremioCatalogCache
 import app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker
+import app.gyrolet.mpvrx.data.addon.TmdbSearchClient
 import app.gyrolet.mpvrx.data.debrid.AllDebridResolver
 import app.gyrolet.mpvrx.data.debrid.DebridService
 import app.gyrolet.mpvrx.data.debrid.RealDebridResolver
@@ -35,10 +37,12 @@ val addonModule = module {
   single { get<MpvRxDatabase>().stremioAddonDao() }
   single { get<MpvRxDatabase>().stremioPlaybackHistoryDao() }
 
-  // Repositories & Services
+  // Cache, Repositories & Services
+  single { StremioCatalogCache(context = get(), json = get()) }
+  single { TmdbSearchClient(debridPreferences = get(), okHttpClient = get(), json = get()) }
   single { AddonClient(okHttpClient = get(), json = get()) }
   single { AddonRepository(addonDao = get()) }
-  single { AddonManager(addonClient = get(), addonRepository = get(), json = get()) }
+  single { AddonManager(addonClient = get(), addonRepository = get(), catalogCache = get(), json = get()) }
   single { StremioPlaybackTracker(historyDao = get()) }
 
   // Debrid & Stream Engine
@@ -50,8 +54,8 @@ val addonModule = module {
 
   // ViewModels
   viewModel { AddonManagementViewModel(get()) }
-  viewModel { AddonDiscoverViewModel(get(), get()) }
+  viewModel { AddonDiscoverViewModel(get(), get(), get()) }
   viewModel { (metaId: String, type: String) ->
-    StremioDetailViewModel(metaId, type, get(), get(), get())
+    StremioDetailViewModel(metaId, type, get(), get(), get(), get())
   }
 }

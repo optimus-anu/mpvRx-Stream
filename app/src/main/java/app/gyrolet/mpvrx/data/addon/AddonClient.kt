@@ -82,6 +82,7 @@ open class AddonClient(
 
   /**
    * Queries a catalog from an addon (`/catalog/{type}/{id}.json` or `/catalog/{type}/{id}/{extraArgs}.json`).
+   * Supports both Stremio v3 path search (`/search=query.json`) and query parameter fallback (`?search=query`).
    */
   open suspend fun fetchCatalog(
     baseUrl: String,
@@ -100,16 +101,41 @@ open class AddonClient(
 
       val response = client.newCall(request).awaitResponse()
       response.use { resp ->
-        if (!resp.isSuccessful) {
-          return Result.failure(IOException("Failed to fetch catalog ($catalogUrl): HTTP ${resp.code} ${resp.message}"))
+        if (resp.isSuccessful) {
+          val body = resp.body.string()
+          if (body.isNotBlank()) {
+            val responseData = json.decodeFromString<StremioMetaResponse>(body)
+            if (responseData.metas.isNotEmpty()) {
+              return Result.success(responseData.metas)
+            }
+          }
         }
-        val body = resp.body.string()
-        if (body.isBlank()) {
-          return Result.failure(IOException("Empty response body from catalog ($catalogUrl)"))
-        }
-        val responseData = json.decodeFromString<StremioMetaResponse>(body)
-        Result.success(responseData.metas)
       }
+
+      // Query parameter fallback if path parameter yielded empty or HTTP error on search
+      if (extra?.containsKey("search") == true) {
+        val queryVal = extra["search"] ?: ""
+        val fallbackUrl = "${baseUrl.trimEnd('/')}/catalog/${AddonUrlUtils.encode(type)}/${AddonUrlUtils.encode(catalogId)}.json?search=${AddonUrlUtils.encode(queryVal)}"
+        val fallbackReq = Request.Builder()
+          .url(fallbackUrl)
+          .header("User-Agent", USER_AGENT)
+          .header("Accept", "application/json")
+          .get()
+          .build()
+
+        val fallbackResp = client.newCall(fallbackReq).awaitResponse()
+        fallbackResp.use { resp ->
+          if (resp.isSuccessful) {
+            val body = resp.body.string()
+            if (body.isNotBlank()) {
+              val responseData = json.decodeFromString<StremioMetaResponse>(body)
+              return Result.success(responseData.metas)
+            }
+          }
+        }
+      }
+
+      Result.success(emptyList())
     } catch (e: CancellationException) {
       throw e
     } catch (e: Exception) {

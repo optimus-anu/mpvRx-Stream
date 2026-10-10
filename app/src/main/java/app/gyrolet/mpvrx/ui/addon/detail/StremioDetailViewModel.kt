@@ -11,11 +11,11 @@ package app.gyrolet.mpvrx.ui.addon.detail
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gyrolet.mpvrx.data.addon.AddonManager
 import app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker
+import app.gyrolet.mpvrx.data.addon.TmdbSearchClient
 import app.gyrolet.mpvrx.database.entities.StremioPlaybackHistoryEntity
 import app.gyrolet.mpvrx.domain.addon.model.StremioMeta
 import app.gyrolet.mpvrx.domain.addon.model.StremioStream
@@ -37,6 +37,7 @@ class StremioDetailViewModel(
   private val addonManager: AddonManager,
   private val streamEngine: StreamEngine,
   private val playbackTracker: StremioPlaybackTracker,
+  private val tmdbSearchClient: TmdbSearchClient,
 ) : ViewModel() {
 
   private val _metaState = MutableStateFlow<StremioMeta?>(null)
@@ -77,7 +78,33 @@ class StremioDetailViewModel(
   fun loadMeta() {
     viewModelScope.launch {
       _isLoadingMeta.value = true
-      val meta = addonManager.queryMeta(type, metaId)
+      val resolvedMetaId = if (metaId.startsWith("tmdb:")) {
+        tmdbSearchClient.resolveImdbId(metaId, type) ?: metaId
+      } else {
+        metaId
+      }
+
+      var meta = addonManager.queryMeta(type, resolvedMetaId)
+      if (meta == null && resolvedMetaId != metaId) {
+        meta = addonManager.queryMeta(type, metaId)
+      }
+
+      // If installed addons didn't return metadata or if item is from TMDB search, query TMDB direct API
+      if (meta == null || metaId.startsWith("tmdb:")) {
+        val tmdbMeta = tmdbSearchClient.getMetaDetails(metaId, type)
+        if (tmdbMeta != null) {
+          meta = if (meta != null) {
+            meta.copy(
+              videos = if (!tmdbMeta.videos.isNullOrEmpty()) tmdbMeta.videos else meta.videos,
+              description = if (meta.description.isNullOrBlank()) tmdbMeta.description else meta.description,
+              genres = if (!tmdbMeta.genres.isNullOrEmpty()) tmdbMeta.genres else meta.genres,
+            )
+          } else {
+            tmdbMeta
+          }
+        }
+      }
+
       _metaState.value = meta
       _isLoadingMeta.value = false
     }
@@ -96,7 +123,12 @@ class StremioDetailViewModel(
       _isLoadingStreams.value = true
       _streamsState.value = emptyList()
       val actualType = _metaState.value?.type?.ifBlank { type } ?: type
-      val streams = addonManager.queryStreams(actualType, targetStreamId)
+      val resolvedStreamId = if (targetStreamId.startsWith("tmdb:")) {
+        tmdbSearchClient.resolveImdbId(targetStreamId, actualType) ?: targetStreamId
+      } else {
+        targetStreamId
+      }
+      val streams = addonManager.queryStreams(actualType, resolvedStreamId)
       _streamsState.value = streams
       _isLoadingStreams.value = false
     }
@@ -118,56 +150,43 @@ class StremioDetailViewModel(
         val video = _selectedVideo.value
 
         // Auto-resume lookup
-        val savedHistory = playbackTracker.getHistory(targetMediaId)
-        var startPositionSeconds = 0.0
-        if (savedHistory != null && !savedHistory.isFinished && savedHistory.lastPositionMs > 5000L) {
-          startPositionSeconds = savedHistory.lastPositionMs / 1000.0
+        val existingHistory = playbackTracker.getHistory(targetMediaId)
+        val startPosSeconds = if (existingHistory != null && !existingHistory.isFinished && existingHistory.lastPositionMs > 5000L) {
+          (existingHistory.lastPositionMs / 1000L).toInt()
+        } else {
+          0
         }
-
-        val playbackItem = PlaybackItem(
-          stableId = "stremio_${targetMediaId}_${stream.name ?: "stream"}",
-          originalUri = playableUrl,
-          playableUri = playableUrl,
-          title = mediaTitle,
-          artworkUri = video?.thumbnail ?: meta?.poster ?: meta?.banner,
-          headers = handle.proxyHeaders ?: emptyMap(),
-        )
 
         val launchToken = PreparedPlaybackLaunchStore.stage(
-          items = listOf(playbackItem),
+          items = listOf(
+            PlaybackItem(
+              stableId = targetMediaId,
+              originalUri = playableUrl,
+              title = mediaTitle,
+            )
+          ),
           currentIndex = 0,
-          isExplicitQueue = true,
         )
 
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(playableUrl)).apply {
-          setClass(context, PlayerActivity::class.java)
-          putExtra("internal_launch", true)
+        val intent = Intent(context, PlayerActivity::class.java).apply {
+          putExtra("launch_token", launchToken)
           putExtra("launch_source", "stremio_addon")
-          putExtra(PlayerActivity.EXTRA_PREPARED_PLAYBACK_QUEUE, true)
-          putExtra(PlayerActivity.EXTRA_PREPARED_PLAYBACK_TOKEN, launchToken)
-          putExtra("title", mediaTitle)
-          putExtra("filename", mediaTitle)
           putExtra("stremio_media_id", targetMediaId)
           putExtra("stremio_type", actualType)
-          putExtra("stremio_series_id", metaId)
-          video?.let { ep ->
-            putExtra("stremio_season", ep.season ?: 1)
-            putExtra("stremio_episode", ep.episode ?: 1)
-            putExtra("stremio_episode_title", ep.title ?: "Episode ${ep.episode}")
+          if (actualType == "series") {
+            putExtra("stremio_series_id", metaId)
+            putExtra("stremio_season", video?.season ?: 1)
+            putExtra("stremio_episode", video?.episode ?: 1)
+            putExtra("stremio_episode_title", mediaTitle)
           }
           putExtra("stremio_title", meta?.name ?: mediaTitle)
-          putExtra("stremio_poster_url", meta?.poster ?: meta?.logo)
-          putExtra("stremio_banner_url", video?.thumbnail ?: meta?.background ?: meta?.banner)
-
-          if (startPositionSeconds > 0.0) {
-            putExtra(PlayerActivity.EXTRA_START_POSITION_SECONDS, startPositionSeconds)
+          putExtra("stremio_poster_url", meta?.poster)
+          putExtra("stremio_banner_url", meta?.banner ?: meta?.background)
+          if (startPosSeconds > 0) {
+            putExtra(PlayerActivity.EXTRA_START_POSITION_SECONDS, startPosSeconds)
           }
-
-          setDataAndType(Uri.parse(playableUrl), "video/*")
-          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
-        closeStreamSheet()
       }
     }
   }

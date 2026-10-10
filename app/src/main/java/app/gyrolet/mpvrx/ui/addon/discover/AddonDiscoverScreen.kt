@@ -26,6 +26,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,7 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.gyrolet.mpvrx.database.entities.StremioPlaybackHistoryEntity
@@ -70,11 +74,13 @@ object AddonDiscoverScreen : Screen {
   override fun Content() {
     val viewModel: AddonDiscoverViewModel = koinViewModel()
     val backStack = LocalBackStack.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val searchMovieResults by viewModel.searchMovieResults.collectAsState()
     val searchSeriesResults by viewModel.searchSeriesResults.collectAsState()
+    val searchOtherResults by viewModel.searchOtherResults.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val catalogRows by viewModel.catalogRows.collectAsState()
     val isLoadingCatalogs by viewModel.isLoadingCatalogs.collectAsState()
@@ -107,15 +113,39 @@ object AddonDiscoverScreen : Screen {
           modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-          placeholder = { Text("Search movies, TV series...") },
+          placeholder = { Text("Type query and press Search...") },
           singleLine = true,
+          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+          keyboardActions = KeyboardActions(
+            onSearch = {
+              keyboardController?.hide()
+              viewModel.performSearch()
+            },
+          ),
           leadingIcon = {
-            Icon(Icons.RoundedFilled.Search, contentDescription = "Search")
+            IconButton(
+              onClick = {
+                keyboardController?.hide()
+                viewModel.performSearch()
+              },
+            ) {
+              Icon(Icons.RoundedFilled.Search, contentDescription = "Search")
+            }
           },
           trailingIcon = {
             if (searchQuery.isNotBlank()) {
-              IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                Icon(Icons.RoundedFilled.Close, contentDescription = "Clear")
+              Row {
+                IconButton(
+                  onClick = {
+                    keyboardController?.hide()
+                    viewModel.performSearch()
+                  },
+                ) {
+                  Icon(Icons.RoundedFilled.ArrowForward, contentDescription = "Perform Search")
+                }
+                IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                  Icon(Icons.RoundedFilled.Close, contentDescription = "Clear")
+                }
               }
             }
           },
@@ -131,7 +161,7 @@ object AddonDiscoverScreen : Screen {
               Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Searching catalogs...")
+                Text("Searching TMDB & catalogs...")
               }
             }
           } else if (searchResults.isEmpty()) {
@@ -140,7 +170,7 @@ object AddonDiscoverScreen : Screen {
               contentAlignment = Alignment.Center,
             ) {
               Text(
-                text = "No results found for '$searchQuery'",
+                text = "No results found for '$searchQuery'. Press Search on keyboard.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
@@ -205,6 +235,34 @@ object AddonDiscoverScreen : Screen {
                   }
                 }
               }
+
+              // Other Results Row
+              if (searchOtherResults.isNotEmpty()) {
+                item {
+                  Column {
+                    Text(
+                      text = "Other Results",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                      modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+
+                    LazyRow(
+                      contentPadding = PaddingValues(horizontal = 16.dp),
+                      horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                      items(searchOtherResults, key = { it.id }) { item ->
+                        StremioCard(
+                          meta = item,
+                          onClick = {
+                            backStack.navigateTo(StremioDetailScreen(metaId = item.id, type = item.type))
+                          },
+                        )
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         } else {
@@ -239,7 +297,7 @@ object AddonDiscoverScreen : Screen {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                  text = "Install Cinemeta or other Stremio catalog addons to display popular movies & shows.",
+                  text = "Install Cinemeta, AIOMetadata, TMDB, or other catalog addons to display movies & shows.",
                   style = MaterialTheme.typography.bodySmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
