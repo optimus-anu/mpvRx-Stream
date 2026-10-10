@@ -85,6 +85,7 @@ internal fun WallpaperHomePreviewDialog(
 ) {
   val appearancePreferences = koinInject<AppearancePreferences>()
   val browserPreferences = koinInject<BrowserPreferences>()
+  val showDiscoverTab by appearancePreferences.showDiscoverTab.collectAsState()
   val showMusicTab by appearancePreferences.showMusicTab.collectAsState()
   val showProfileTab by appearancePreferences.showProfileTab.collectAsState()
   val showNetworkTab by appearancePreferences.showNetworkTab.collectAsState()
@@ -94,8 +95,9 @@ internal fun WallpaperHomePreviewDialog(
 
   // Same tab order as MainScreen; the pill only shows with 2+ tabs.
   val navigationTabs =
-    remember(showMusicTab, showProfileTab, showNetworkTab, showJellyfinTab) {
+    remember(showDiscoverTab, showMusicTab, showProfileTab, showNetworkTab, showJellyfinTab) {
       mainNavigationTabs(
+        showDiscover = showDiscoverTab,
         showMusic = showMusicTab,
         showProfile = showProfileTab,
         showNetwork = showNetworkTab,

@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
   <string name="pref_liquid_glass_material">Glass material</string>
   <string name="pref_liquid_glass_frost">Frost</string>
   <string name="generic_increase">Increase</string>
@@ -112,6 +112,8 @@
   <string name="pref_appearance_show_network_thumbnails_summary">Generate thumbnails for network streams (May increase data usage on mobile networks)</string>
   <string name="pref_nav_home_title">Show Home tab</string>
   <string name="pref_nav_home_summary">Show or hide Home in the bottom navigation bar</string>
+  <string name="pref_nav_discover_title" tools:ignore="MissingTranslation">Show Discover tab</string>
+  <string name="pref_nav_discover_summary" tools:ignore="MissingTranslation">Show or hide Discover in the bottom navigation bar</string>
   <string name="pref_nav_music_title">Show Music tab</string>
   <string name="pref_nav_music_summary">Show or hide Music in the bottom navigation bar</string>
   <string name="pref_nav_network_title">Show Network tab</string>
@@ -1515,6 +1517,7 @@
   <string name="media_widget_video">Video</string>
   <string name="ui_logcat">Logcat:</string>
   <string name="ui_home">Home</string>
+  <string name="ui_discover" tools:ignore="MissingTranslation">Discover</string>
   <string name="ui_music">Music</string>
   <string name="ui_recents">Recents</string>
   <string name="ui_playlists">Playlists</string>

@@ -151,6 +151,7 @@ import org.koin.compose.koinInject
 object MainScreen : Screen {
   internal enum class MainTab {
     HOME,
+    DISCOVER,
     MUSIC,
     NETWORK,
     JELLYFIN,
@@ -206,6 +207,7 @@ object MainScreen : Screen {
     val musicSourceProvider by mediaServerPreferences.musicSourceProvider.collectAsState()
     val musicLibraryViewModel: MusicLibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val localMusicTabs by musicLibraryViewModel.visibleTabs.collectAsStateWithLifecycle()
+    val showDiscoverTab by appearancePreferences.showDiscoverTab.collectAsState()
     val showMusicTab by appearancePreferences.showMusicTab.collectAsState()
     val showProfileTab by appearancePreferences.showProfileTab.collectAsState()
     val showNetworkTab by appearancePreferences.showNetworkTab.collectAsState()
@@ -219,12 +221,14 @@ object MainScreen : Screen {
 
     val visibleTabs =
       remember(
+        showDiscoverTab,
         showMusicTab,
         showProfileTab,
         showNetworkTab,
         showJellyfinTab,
       ) {
         mainNavigationTabs(
+          showDiscover = showDiscoverTab,
           showMusic = showMusicTab,
           showProfile = showProfileTab,
           showNetwork = showNetworkTab,
@@ -463,6 +467,7 @@ object MainScreen : Screen {
               val tab = visibleTabs.getOrNull(page) ?: return@NavigationPager
               when (tab) {
                 MainTab.HOME -> FolderListScreen.Content()
+                MainTab.DISCOVER -> app.gyrolet.mpvrx.ui.addon.discover.AddonDiscoverScreen.Content()
                 MainTab.MUSIC -> {
                   if (musicSourceProvider == MusicSourceProvider.JELLYFIN) {
                     val jellyfinUiState by jellyfinViewModel.uiState.collectAsStateWithLifecycle()
@@ -1006,6 +1011,7 @@ internal fun ExpressivePillNavigationBar(
 private fun mainNavigationLabel(tab: MainScreen.MainTab): String =
   stringResource(when (tab) {
     MainScreen.MainTab.HOME -> R.string.ui_home
+    MainScreen.MainTab.DISCOVER -> R.string.ui_discover
     MainScreen.MainTab.MUSIC -> R.string.ui_music
     MainScreen.MainTab.NETWORK -> R.string.ui_network
     MainScreen.MainTab.JELLYFIN -> R.string.ui_jellyfin
@@ -1029,6 +1035,7 @@ private fun MainTabIcon(
   }
   val icon = when (tab) {
     MainScreen.MainTab.HOME -> Icons.RoundedFilled.Home
+    MainScreen.MainTab.DISCOVER -> Icons.RoundedFilled.Explore
     MainScreen.MainTab.MUSIC -> Icons.RoundedFilled.Audiotrack
     MainScreen.MainTab.NETWORK -> Icons.RoundedFilled.BringYourOwnIp
     MainScreen.MainTab.JELLYFIN -> null
@@ -1059,13 +1066,15 @@ private val NavigationBarEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
  * tab. The Profile tab absorbs Recents, Playlists and Snapshots, which stay reachable from inside it.
  */
 internal fun mainNavigationTabs(
-  showMusic: Boolean,
-  showProfile: Boolean,
-  showNetwork: Boolean,
-  showJellyfin: Boolean,
+  showDiscover: Boolean = true,
+  showMusic: Boolean = true,
+  showProfile: Boolean = true,
+  showNetwork: Boolean = false,
+  showJellyfin: Boolean = false,
 ): List<MainScreen.MainTab> =
   buildList {
     add(MainScreen.MainTab.HOME)
+    if (showDiscover) add(MainScreen.MainTab.DISCOVER)
     if (showMusic) add(MainScreen.MainTab.MUSIC)
     if (showNetwork) add(MainScreen.MainTab.NETWORK)
     if (showJellyfin) add(MainScreen.MainTab.JELLYFIN)

@@ -101,6 +101,7 @@ class AppearancePreferences(
   val seekbarStyle = preferenceStore.getEnum("seekbar_style", SeekbarStyle.Thick)
   val portraitPlaybackControlsPosition =
     preferenceStore.getEnum("portrait_playback_controls_position", PortraitPlaybackControlsPosition.Center)
+  val showDiscoverTab = preferenceStore.getBoolean("show_discover_tab", true)
   val showMusicTab = preferenceStore.getBoolean("show_music_tab", true)
   val showProfileTab = preferenceStore.getBoolean("show_profile_tab", true)
   val profileName = preferenceStore.getString("profile_name", "")

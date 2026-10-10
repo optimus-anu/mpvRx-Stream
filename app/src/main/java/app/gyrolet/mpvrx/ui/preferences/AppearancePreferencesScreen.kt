@@ -791,10 +791,26 @@ object AppearancePreferencesScreen : Screen {
 
           item {
             PreferenceCard {
+              val showDiscoverTab by preferences.showDiscoverTab.collectAsState()
               val showMusicTab by preferences.showMusicTab.collectAsState()
               val showProfileTab by preferences.showProfileTab.collectAsState()
               val showNetworkTab by preferences.showNetworkTab.collectAsState()
               val showJellyfinTab by preferences.showJellyfinTab.collectAsState()
+
+              SwitchPreference(
+                modifier = Modifier.settingsSearchTarget(R.string.pref_nav_discover_title),
+                value = showDiscoverTab,
+                onValueChange = preferences.showDiscoverTab::set,
+                title = { Text(text = stringResource(id = R.string.pref_nav_discover_title)) },
+                summary = {
+                  Text(
+                    text = stringResource(id = R.string.pref_nav_discover_summary),
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+              )
+
+              PreferenceDivider()
 
               SwitchPreference(
                 modifier = Modifier.settingsSearchTarget(R.string.pref_nav_music_title),
