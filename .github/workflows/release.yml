@@ -78,6 +78,7 @@ jobs:
       GRADLE_FLAVOR: ${{ matrix.distribution.gradle }}
       APK_DIR: ${{ matrix.distribution.dir }}
       APK_ABIS: ${{ matrix.distribution.abis }}
+      ASSET_NAME: ${{ matrix.distribution.asset }}
 
     steps:
       - name: Checkout repository
