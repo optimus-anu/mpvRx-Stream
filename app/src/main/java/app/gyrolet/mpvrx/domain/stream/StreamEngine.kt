@@ -70,7 +70,8 @@ class StreamEngine(
 
       // Case 2: Torrent / InfoHash stream
       if (stream.isTorrent) {
-        val infoHash = stream.infoHash!!.trim()
+        val infoHash = stream.getEffectiveInfoHash()
+          ?: return@withContext Result.failure(IllegalArgumentException("No valid infoHash found in stream descriptor"))
         val fileIdx = stream.fileIdx
 
         // Step 2a: Try Debrid resolution if configured

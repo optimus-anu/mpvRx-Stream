@@ -61,6 +61,9 @@ class StremioDetailViewModel(
   private val _currentStreamTitle = MutableStateFlow("")
   val currentStreamTitle: StateFlow<String> = _currentStreamTitle.asStateFlow()
 
+  private val _errorMessage = MutableStateFlow<String?>(null)
+  val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
   private val _currentStreamId = MutableStateFlow("")
   private val _selectedVideo = MutableStateFlow<StremioVideo?>(null)
 
@@ -73,6 +76,10 @@ class StremioDetailViewModel(
 
   init {
     loadMeta()
+  }
+
+  fun clearError() {
+    _errorMessage.value = null
   }
 
   fun loadMeta() {
@@ -187,6 +194,9 @@ class StremioDetailViewModel(
           }
         }
         context.startActivity(intent)
+      } else {
+        val err = result.exceptionOrNull()?.localizedMessage ?: "Failed to resolve stream link"
+        _errorMessage.value = err
       }
     }
   }

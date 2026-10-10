@@ -43,8 +43,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,6 +93,15 @@ data class StremioDetailScreen(
     val showStreamSheet by viewModel.showStreamSheet.collectAsState()
     val currentStreamTitle by viewModel.currentStreamTitle.collectAsState()
     val seriesHistory by viewModel.seriesHistory.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+
+    LaunchedEffect(errorMessage) {
+      errorMessage?.let { error ->
+        snackbarHostState.showSnackbar(error)
+        viewModel.clearError()
+      }
+    }
 
     if (showStreamSheet) {
       StreamSelectionSheet(
@@ -118,6 +129,7 @@ data class StremioDetailScreen(
           ),
         )
       },
+      snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
     ) { padding ->
       if (isLoadingMeta) {
         Box(

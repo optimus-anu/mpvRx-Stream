@@ -282,7 +282,7 @@ data class StremioStream(
       (url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true))
 
   val isTorrent: Boolean
-    get() = !infoHash.isNullOrBlank()
+    get() = !infoHash.isNullOrBlank() || (!url.isNullOrBlank() && url.startsWith("magnet:", ignoreCase = true))
 
   val isExternal: Boolean
     get() = !externalUrl.isNullOrBlank()
@@ -290,8 +290,19 @@ data class StremioStream(
   val isYouTube: Boolean
     get() = !ytId.isNullOrBlank()
 
+  fun getEffectiveInfoHash(): String? {
+    val hash = infoHash?.trim()
+    if (!hash.isNullOrBlank()) return hash
+    val rawUrl = url?.trim() ?: return null
+    if (rawUrl.startsWith("magnet:", ignoreCase = true)) {
+      val match = Regex("xt=urn:btih:([a-zA-Z0-9]+)", RegexOption.IGNORE_CASE).find(rawUrl)
+      return match?.groupValues?.get(1)
+    }
+    return null
+  }
+
   fun getMagnetUri(): String? {
-    val hash = infoHash?.trim() ?: return null
+    val hash = getEffectiveInfoHash() ?: return null
     if (hash.isEmpty()) return null
     val idxParam = fileIdx?.let { "&f=$it" } ?: ""
     val nameParam = name?.let {

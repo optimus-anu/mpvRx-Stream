@@ -16,6 +16,9 @@ import app.gyrolet.mpvrx.network.SharedHttpClient
 import app.gyrolet.mpvrx.network.awaitResponse
 import app.gyrolet.mpvrx.preferences.DebridPreferences
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -109,6 +112,8 @@ private data class TmdbEpisodeItem(
 
 class TmdbSearchClient(
   private val debridPreferences: DebridPreferences,
+  private val searchCache: StremioSearchCache? = null,
+  private val metaCache: StremioMetaCache? = null,
   okHttpClient: OkHttpClient = SharedHttpClient.base,
   private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
@@ -126,14 +131,21 @@ class TmdbSearchClient(
   }
 
   /**
-   * Direct multi-search against official TMDB API.
+   * Direct multi-search against official TMDB API with memory & disk caching.
    */
   suspend fun searchMulti(query: String): Result<List<StremioMeta>> {
-    if (query.isBlank()) return Result.success(emptyList())
+    val trimmed = query.trim()
+    if (trimmed.isBlank()) return Result.success(emptyList())
+
+    // Check cache first (<5ms)
+    val cached = searchCache?.get(trimmed)
+    if (!cached.isNullOrEmpty()) {
+      return Result.success(cached)
+    }
 
     return try {
       val apiKey = getEffectiveApiKey()
-      val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
+      val encodedQuery = URLEncoder.encode(trimmed, "UTF-8")
       val url = "https://api.themoviedb.org/3/search/multi?api_key=$apiKey&query=$encodedQuery&include_adult=false&language=en-US"
 
       val request = Request.Builder()
@@ -178,6 +190,10 @@ class TmdbSearchClient(
           )
         }
 
+        if (metas.isNotEmpty()) {
+          searchCache?.put(trimmed, metas)
+        }
+
         Result.success(metas)
       }
     } catch (e: CancellationException) {
@@ -189,43 +205,50 @@ class TmdbSearchClient(
   }
 
   /**
-   * Fetches full metadata details directly from official TMDB API for a TMDB media ID.
+   * Fetches full metadata details directly from official TMDB API in parallel with caching.
    */
-  suspend fun getMetaDetails(rawId: String, type: String): StremioMeta? {
+  suspend fun getMetaDetails(rawId: String, type: String): StremioMeta? = coroutineScope {
     val cleanId = rawId.removePrefix("tmdb:").trim()
-    if (cleanId.isBlank()) return null
+    if (cleanId.isBlank()) return@coroutineScope null
+
+    // Check cache first (<5ms)
+    val cached = metaCache?.get(rawId)
+    if (cached != null) {
+      return@coroutineScope cached
+    }
+
     val apiKey = getEffectiveApiKey()
 
-    return try {
+    try {
       if (type == "series" || type == "tv") {
         val url = "https://api.themoviedb.org/3/tv/$cleanId?api_key=$apiKey&append_to_response=external_ids&language=en-US"
         val request = Request.Builder().url(url).header("User-Agent", USER_AGENT).get().build()
         val response = client.newCall(request).awaitResponse()
         response.use { resp ->
-          if (!resp.isSuccessful) return null
+          if (!resp.isSuccessful) return@coroutineScope null
           val data = json.decodeFromString<TmdbTvDetailResponse>(resp.body.string())
           val posterUrl = data.poster_path?.let { "https://image.tmdb.org/t/p/w500$it" }
           val backdropUrl = data.backdrop_path?.let { "https://image.tmdb.org/t/p/w1280$it" }
           val yearStr = data.first_air_date?.substringBefore("-")
           val imdbId = data.external_ids?.imdb_id
 
-          val allVideos = mutableListOf<StremioVideo>()
           val seasonList = data.seasons?.filter { it.season_number > 0 } ?: emptyList()
 
-          for (s in seasonList) {
-            val seasonUrl = "https://api.themoviedb.org/3/tv/$cleanId/season/${s.season_number}?api_key=$apiKey&language=en-US"
-            val sReq = Request.Builder().url(seasonUrl).header("User-Agent", USER_AGENT).get().build()
-            val sResp = client.newCall(sReq).awaitResponse()
-            sResp.use { sRes ->
-              if (sRes.isSuccessful) {
-                val sData = json.decodeFromString<TmdbSeasonDetailResponse>(sRes.body.string())
-                sData.episodes.forEach { ep ->
-                  val epStreamId = if (!imdbId.isNullOrBlank()) {
-                    "$imdbId:${ep.season_number}:${ep.episode_number}"
-                  } else {
-                    "tmdb:$cleanId:${ep.season_number}:${ep.episode_number}"
-                  }
-                  allVideos.add(
+          // Parallel season fetching
+          val seasonJobs = seasonList.map { s ->
+            async {
+              val seasonUrl = "https://api.themoviedb.org/3/tv/$cleanId/season/${s.season_number}?api_key=$apiKey&language=en-US"
+              val sReq = Request.Builder().url(seasonUrl).header("User-Agent", USER_AGENT).get().build()
+              val sResp = client.newCall(sReq).awaitResponse()
+              sResp.use { sRes ->
+                if (sRes.isSuccessful) {
+                  val sData = json.decodeFromString<TmdbSeasonDetailResponse>(sRes.body.string())
+                  sData.episodes.map { ep ->
+                    val epStreamId = if (!imdbId.isNullOrBlank()) {
+                      "$imdbId:${ep.season_number}:${ep.episode_number}"
+                    } else {
+                      "tmdb:$cleanId:${ep.season_number}:${ep.episode_number}"
+                    }
                     StremioVideo(
                       id = epStreamId,
                       title = ep.name,
@@ -235,13 +258,17 @@ class TmdbSearchClient(
                       overview = ep.overview,
                       thumbnail = ep.still_path?.let { "https://image.tmdb.org/t/p/w500$it" },
                     )
-                  )
+                  }
+                } else {
+                  emptyList()
                 }
               }
             }
           }
 
-          StremioMeta(
+          val allVideos = seasonJobs.awaitAll().flatten()
+
+          val metaResult = StremioMeta(
             id = imdbId ?: rawId,
             type = "series",
             name = data.name ?: "Unknown Series",
@@ -255,20 +282,23 @@ class TmdbSearchClient(
             genres = data.genres?.map { it.name },
             videos = allVideos,
           )
+
+          metaCache?.put(rawId, metaResult)
+          metaResult
         }
       } else {
         val url = "https://api.themoviedb.org/3/movie/$cleanId?api_key=$apiKey&append_to_response=external_ids&language=en-US"
         val request = Request.Builder().url(url).header("User-Agent", USER_AGENT).get().build()
         val response = client.newCall(request).awaitResponse()
         response.use { resp ->
-          if (!resp.isSuccessful) return null
+          if (!resp.isSuccessful) return@coroutineScope null
           val data = json.decodeFromString<TmdbMovieDetailResponse>(resp.body.string())
           val posterUrl = data.poster_path?.let { "https://image.tmdb.org/t/p/w500$it" }
           val backdropUrl = data.backdrop_path?.let { "https://image.tmdb.org/t/p/w1280$it" }
           val yearStr = data.release_date?.substringBefore("-")
           val imdbId = data.external_ids?.imdb_id
 
-          StremioMeta(
+          val metaResult = StremioMeta(
             id = imdbId ?: rawId,
             type = "movie",
             name = data.title ?: "Unknown Movie",
@@ -281,6 +311,9 @@ class TmdbSearchClient(
             releaseInfo = yearStr,
             genres = data.genres?.map { it.name },
           )
+
+          metaCache?.put(rawId, metaResult)
+          metaResult
         }
       }
     } catch (e: Exception) {

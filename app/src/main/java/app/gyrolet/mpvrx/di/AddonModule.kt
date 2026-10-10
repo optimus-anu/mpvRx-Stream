@@ -13,7 +13,9 @@ import app.gyrolet.mpvrx.data.addon.AddonClient
 import app.gyrolet.mpvrx.data.addon.AddonManager
 import app.gyrolet.mpvrx.data.addon.AddonRepository
 import app.gyrolet.mpvrx.data.addon.StremioCatalogCache
+import app.gyrolet.mpvrx.data.addon.StremioMetaCache
 import app.gyrolet.mpvrx.data.addon.StremioPlaybackTracker
+import app.gyrolet.mpvrx.data.addon.StremioSearchCache
 import app.gyrolet.mpvrx.data.addon.TmdbSearchClient
 import app.gyrolet.mpvrx.data.debrid.AllDebridResolver
 import app.gyrolet.mpvrx.data.debrid.DebridService
@@ -37,9 +39,11 @@ val addonModule = module {
   single { get<MpvRxDatabase>().stremioAddonDao() }
   single { get<MpvRxDatabase>().stremioPlaybackHistoryDao() }
 
-  // Cache, Repositories & Services
+  // Caches, Repositories & Services
   single { StremioCatalogCache(context = get(), json = get()) }
-  single { TmdbSearchClient(debridPreferences = get(), okHttpClient = get(), json = get()) }
+  single { StremioSearchCache(context = get(), json = get()) }
+  single { StremioMetaCache(context = get(), json = get()) }
+  single { TmdbSearchClient(debridPreferences = get(), searchCache = get(), metaCache = get(), okHttpClient = get(), json = get()) }
   single { AddonClient(okHttpClient = get(), json = get()) }
   single { AddonRepository(addonDao = get()) }
   single { AddonManager(addonClient = get(), addonRepository = get(), catalogCache = get(), json = get()) }

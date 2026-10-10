@@ -37,8 +37,7 @@ class AddonManager(
   private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
   companion object {
-    private const val ADDON_QUERY_TIMEOUT_MS = 12_000L
-    private const val CINEMETA_SEARCH_BASE_URL = "https://v3-cinemeta.strem.io"
+    private const val ADDON_QUERY_TIMEOUT_MS = 3_500L
   }
 
   val installedAddons: Flow<List<StremioAddonEntity>> = addonRepository.allAddons
@@ -203,24 +202,7 @@ class AddonManager(
       }
     }
 
-    val installedResults = deferreds.awaitAll().flatten().distinctBy { it.id }
-
-    if (installedResults.isNotEmpty()) {
-      installedResults
-    } else {
-      // Fallback to Cinemeta search if installed search addons returned 0 results or timed out
-      val fallbackMovie = async {
-        withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
-          addonClient.fetchCatalog(CINEMETA_SEARCH_BASE_URL, "movie", "top", searchExtra).getOrDefault(emptyList())
-        } ?: emptyList()
-      }
-      val fallbackSeries = async {
-        withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
-          addonClient.fetchCatalog(CINEMETA_SEARCH_BASE_URL, "series", "top", searchExtra).getOrDefault(emptyList())
-        } ?: emptyList()
-      }
-      (fallbackMovie.await() + fallbackSeries.await()).distinctBy { it.id }
-    }
+    deferreds.awaitAll().flatten().distinctBy { it.id }
   }
 
   /**

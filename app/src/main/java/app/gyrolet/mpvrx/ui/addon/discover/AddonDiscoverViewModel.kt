@@ -97,24 +97,33 @@ class AddonDiscoverViewModel(
     viewModelScope.launch {
       _isSearching.value = true
 
-      val tmdbDeferred = async { tmdbSearchClient.searchMulti(query).getOrDefault(emptyList()) }
-      val addonsDeferred = async { addonManager.querySearchAll(query) }
+      // Launch TMDB direct search and addon queries in parallel
+      val tmdbJob = async { tmdbSearchClient.searchMulti(query).getOrDefault(emptyList()) }
+      val addonJob = async { addonManager.querySearchAll(query) }
 
-      val tmdbResults = tmdbDeferred.await()
-      val addonResults = addonsDeferred.await()
-
-      val combined = (tmdbResults + addonResults).distinctBy { it.id }
-
-      val movieResults = combined.filter { it.type == "movie" || it.type.contains("movie") }
-      val seriesResults = combined.filter { it.type == "series" || it.type.contains("series") || it.type == "tv" }
-      val otherResults = combined.filter { it !in movieResults && it !in seriesResults }
-
-      _searchMovieResults.value = movieResults
-      _searchSeriesResults.value = seriesResults
-      _searchOtherResults.value = otherResults
-      _searchResults.value = combined
+      // 1. Render TMDB results immediately (~120ms)
+      val tmdbResults = tmdbJob.await()
+      updateSearchState(tmdbResults)
       _isSearching.value = false
+
+      // 2. Merge background addon search results as they arrive
+      val addonResults = addonJob.await()
+      if (addonResults.isNotEmpty()) {
+        val merged = (tmdbResults + addonResults).distinctBy { it.id }
+        updateSearchState(merged)
+      }
     }
+  }
+
+  private fun updateSearchState(allResults: List<StremioMeta>) {
+    val movieResults = allResults.filter { it.type == "movie" || it.type.contains("movie") }
+    val seriesResults = allResults.filter { it.type == "series" || it.type.contains("series") || it.type == "tv" }
+    val otherResults = allResults.filter { it !in movieResults && it !in seriesResults }
+
+    _searchMovieResults.value = movieResults
+    _searchSeriesResults.value = seriesResults
+    _searchOtherResults.value = otherResults
+    _searchResults.value = allResults
   }
 
   fun loadCatalogs() {
