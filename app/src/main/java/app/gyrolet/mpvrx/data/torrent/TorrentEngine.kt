@@ -23,6 +23,7 @@ class TorrentEngine private constructor() {
 
   companion object {
     private const val TAG = "TorrentEngine"
+    private const val MAX_CACHE_SIZE_BYTES = 2_000_000_000L // 2 GB max torrent cache
 
     @Volatile
     private var instance: TorrentEngine? = null
@@ -74,6 +75,8 @@ class TorrentEngine private constructor() {
     val cacheDir = File(context.cacheDir, "torrent_stream_cache")
     if (!cacheDir.exists()) {
       cacheDir.mkdirs()
+    } else {
+      pruneCacheDir(cacheDir)
     }
 
     Log.d(TAG, "Fetching torrent metadata for $magnetUri")
@@ -152,6 +155,28 @@ class TorrentEngine private constructor() {
       sessionManager.stop()
     } catch (e: Exception) {
       Log.e(TAG, "Error stopping SessionManager", e)
+    }
+  }
+
+  private fun pruneCacheDir(cacheDir: File) {
+    try {
+      val files = cacheDir.walkTopDown().filter { it.isFile }.toList()
+      var totalSize = files.sumOf { it.length() }
+      if (totalSize > MAX_CACHE_SIZE_BYTES) {
+        val activeDiskFiles = activeSessions.values.map { it.fileOnDisk.absolutePath }.toSet()
+        val sortedByAge = files.filter { it.absolutePath !in activeDiskFiles }
+          .sortedBy { it.lastModified() }
+
+        for (file in sortedByAge) {
+          if (totalSize <= MAX_CACHE_SIZE_BYTES) break
+          val length = file.length()
+          if (file.delete()) {
+            totalSize -= length
+          }
+        }
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error pruning torrent cache directory", e)
     }
   }
 

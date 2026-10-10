@@ -20,6 +20,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 
 class AddonManager(
@@ -31,6 +32,7 @@ class AddonManager(
   companion object {
     private const val TAG = "AddonManager"
     const val CINEMETA_MANIFEST_URL = "https://v3-cinemeta.strem.io/manifest.json"
+    private const val ADDON_QUERY_TIMEOUT_MS = 12_000L
   }
 
   val installedAddons: Flow<List<StremioAddonEntity>> = addonRepository.allAddons
@@ -167,8 +169,10 @@ class AddonManager(
 
       matchingCatalogs.map { catalog ->
         async {
-          val result = addonClient.fetchCatalog(addon.baseUrl, type, catalog.id, extra)
-          result.getOrDefault(emptyList())
+          withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
+            val result = addonClient.fetchCatalog(addon.baseUrl, type, catalog.id, extra)
+            result.getOrDefault(emptyList())
+          } ?: emptyList()
         }
       }
     }
@@ -190,8 +194,10 @@ class AddonManager(
 
     val deferreds = eligibleAddons.map { addon ->
       async {
-        val result = addonClient.fetchMeta(addon.baseUrl, type, metaId)
-        result.getOrNull()
+        withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
+          val result = addonClient.fetchMeta(addon.baseUrl, type, metaId)
+          result.getOrNull()
+        }
       }
     }
 
@@ -214,11 +220,13 @@ class AddonManager(
 
     val deferreds = eligibleAddons.map { addon ->
       async {
-        val result = addonClient.fetchStreams(addon.baseUrl, type, streamId)
-        val streams = result.getOrDefault(emptyList())
-        streams.map { stream ->
-          if (stream.addonName == null) stream.copy(addonName = addon.name) else stream
-        }
+        withTimeoutOrNull(ADDON_QUERY_TIMEOUT_MS) {
+          val result = addonClient.fetchStreams(addon.baseUrl, type, streamId)
+          val streams = result.getOrDefault(emptyList())
+          streams.map { stream ->
+            if (stream.addonName == null) stream.copy(addonName = addon.name) else stream
+          }
+        } ?: emptyList()
       }
     }
 
