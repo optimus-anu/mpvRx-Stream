@@ -34,7 +34,7 @@ data class CatalogRowState(
 
 class AddonDiscoverViewModel(
   private val addonManager: AddonManager,
-  private val playbackTracker: StremioPlaybackTracker,
+  playbackTracker: StremioPlaybackTracker,
 ) : ViewModel() {
 
   val continueWatching: StateFlow<List<StremioPlaybackHistoryEntity>> =
@@ -52,6 +52,12 @@ class AddonDiscoverViewModel(
 
   private val _searchResults = MutableStateFlow<List<StremioMeta>>(emptyList())
   val searchResults: StateFlow<List<StremioMeta>> = _searchResults.asStateFlow()
+
+  private val _searchMovieResults = MutableStateFlow<List<StremioMeta>>(emptyList())
+  val searchMovieResults: StateFlow<List<StremioMeta>> = _searchMovieResults.asStateFlow()
+
+  private val _searchSeriesResults = MutableStateFlow<List<StremioMeta>>(emptyList())
+  val searchSeriesResults: StateFlow<List<StremioMeta>> = _searchSeriesResults.asStateFlow()
 
   private val _catalogRows = MutableStateFlow<List<CatalogRowState>>(emptyList())
   val catalogRows: StateFlow<List<CatalogRowState>> = _catalogRows.asStateFlow()
@@ -73,6 +79,8 @@ class AddonDiscoverViewModel(
       performSearch(query)
     } else {
       _searchResults.value = emptyList()
+      _searchMovieResults.value = emptyList()
+      _searchSeriesResults.value = emptyList()
       _isSearching.value = false
     }
   }
@@ -116,8 +124,10 @@ class AddonDiscoverViewModel(
       _isSearching.value = true
       val movieResults = addonManager.queryCatalogs("movie", "top", mapOf("search" to query))
       val seriesResults = addonManager.queryCatalogs("series", "top", mapOf("search" to query))
-      val combined = (movieResults + seriesResults).distinctBy { it.id }
-      _searchResults.value = combined
+
+      _searchMovieResults.value = movieResults.distinctBy { it.id }
+      _searchSeriesResults.value = seriesResults.distinctBy { it.id }
+      _searchResults.value = (movieResults + seriesResults).distinctBy { it.id }
       _isSearching.value = false
     }
   }

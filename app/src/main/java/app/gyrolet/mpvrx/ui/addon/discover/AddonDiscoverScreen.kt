@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,9 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -77,6 +73,8 @@ object AddonDiscoverScreen : Screen {
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
+    val searchMovieResults by viewModel.searchMovieResults.collectAsState()
+    val searchSeriesResults by viewModel.searchSeriesResults.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val catalogRows by viewModel.catalogRows.collectAsState()
     val isLoadingCatalogs by viewModel.isLoadingCatalogs.collectAsState()
@@ -124,7 +122,7 @@ object AddonDiscoverScreen : Screen {
         )
 
         if (searchQuery.isNotBlank()) {
-          // Search Results View
+          // Categorized Search Results View
           if (isSearching) {
             Box(
               modifier = Modifier.fillMaxSize(),
@@ -148,19 +146,64 @@ object AddonDiscoverScreen : Screen {
               )
             }
           } else {
-            LazyVerticalGrid(
-              columns = GridCells.Adaptive(minSize = 130.dp),
-              contentPadding = PaddingValues(16.dp),
-              horizontalArrangement = Arrangement.spacedBy(12.dp),
-              verticalArrangement = Arrangement.spacedBy(16.dp),
+            LazyColumn(
+              contentPadding = PaddingValues(bottom = 24.dp),
+              verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-              items(searchResults, key = { it.id }) { item ->
-                StremioCard(
-                  meta = item,
-                  onClick = {
-                    backStack.navigateTo(StremioDetailScreen(metaId = item.id, type = item.type))
-                  },
-                )
+              // Movies Search Row
+              if (searchMovieResults.isNotEmpty()) {
+                item {
+                  Column {
+                    Text(
+                      text = "Popular - Movie",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                      modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+
+                    LazyRow(
+                      contentPadding = PaddingValues(horizontal = 16.dp),
+                      horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                      items(searchMovieResults, key = { it.id }) { item ->
+                        StremioCard(
+                          meta = item,
+                          onClick = {
+                            backStack.navigateTo(StremioDetailScreen(metaId = item.id, type = item.type))
+                          },
+                        )
+                      }
+                    }
+                  }
+                }
+              }
+
+              // Series Search Row
+              if (searchSeriesResults.isNotEmpty()) {
+                item {
+                  Column {
+                    Text(
+                      text = "Popular - Series",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                      modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+
+                    LazyRow(
+                      contentPadding = PaddingValues(horizontal = 16.dp),
+                      horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                      items(searchSeriesResults, key = { it.id }) { item ->
+                        StremioCard(
+                          meta = item,
+                          onClick = {
+                            backStack.navigateTo(StremioDetailScreen(metaId = item.id, type = item.type))
+                          },
+                        )
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -292,6 +335,7 @@ private fun ContinueWatchingCard(
   Card(
     modifier = Modifier
       .width(160.dp)
+      .height(145.dp)
       .clip(RoundedCornerShape(12.dp))
       .clickable(onClick = onClick),
     shape = RoundedCornerShape(12.dp),
@@ -299,11 +343,13 @@ private fun ContinueWatchingCard(
       containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
     ),
   ) {
-    Column {
+    Column(
+      modifier = Modifier.fillMaxSize(),
+    ) {
       Box(
         modifier = Modifier
           .fillMaxWidth()
-          .aspectRatio(16f / 9f)
+          .height(90.dp)
           .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
       ) {
@@ -341,7 +387,9 @@ private fun ContinueWatchingCard(
       }
 
       Column(
-        modifier = Modifier.padding(8.dp),
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(8.dp),
       ) {
         Text(
           text = item.title,
@@ -351,16 +399,17 @@ private fun ContinueWatchingCard(
           overflow = TextOverflow.Ellipsis,
         )
 
-        if (!item.episodeTitle.isNullOrBlank()) {
-          Spacer(modifier = Modifier.height(2.dp))
-          Text(
-            text = item.episodeTitle,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
-        }
+        val subTitleText = item.episodeTitle ?: if (item.type == "series" && item.season != null && item.episode != null) {
+          "S${item.season}:E${item.episode}"
+        } else ""
+
+        Text(
+          text = subTitleText,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
       }
     }
   }
