@@ -393,6 +393,26 @@ data class StremioDetailScreen(
   }
 }
 
+private fun formatReleaseDate(rawDate: String?): String? {
+  if (rawDate.isNullOrBlank()) return null
+  val datePart = rawDate.substringBefore("T").trim()
+  return try {
+    val parts = datePart.split("-")
+    if (parts.size == 3) {
+      val year = parts[0]
+      val monthInt = parts[1].toIntOrNull() ?: 1
+      val day = parts[2].toIntOrNull() ?: 1
+      val monthNames = listOf("", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+      val monthStr = monthNames.getOrElse(monthInt) { "" }
+      if (monthStr.isNotBlank()) "$day $monthStr $year" else datePart
+    } else {
+      datePart
+    }
+  } catch (_: Exception) {
+    datePart
+  }
+}
+
 @Composable
 private fun EpisodeItemCard(
   video: StremioVideo,
@@ -447,7 +467,7 @@ private fun EpisodeItemCard(
               .align(Alignment.TopEnd)
               .padding(4.dp),
             shape = RoundedCornerShape(4.dp),
-            color = Color(0xFFFFC107), // Yellow badge
+            color = Color(0xFFFFC107),
           ) {
             Text(
               text = "👁",
@@ -482,10 +502,11 @@ private fun EpisodeItemCard(
           overflow = TextOverflow.Ellipsis,
         )
 
-        if (!video.released.isNullOrBlank()) {
+        val formattedDate = formatReleaseDate(video.released)
+        if (!formattedDate.isNullOrBlank()) {
           Spacer(modifier = Modifier.height(2.dp))
           Text(
-            text = video.released,
+            text = formattedDate,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
           )

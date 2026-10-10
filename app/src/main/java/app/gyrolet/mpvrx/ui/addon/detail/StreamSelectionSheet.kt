@@ -74,14 +74,7 @@ fun StreamSelectionSheet(
   val filteredStreams = remember(streams, selectedAddonFilter, selectedQualityFilter) {
     streams.filter { stream ->
       val addonMatches = if (selectedAddonFilter == "All Addons") true else stream.addonName == selectedAddonFilter
-      val qualityMatches = when (selectedQualityFilter) {
-        "4K" -> stream.title?.contains("4k", ignoreCase = true) == true || stream.name?.contains("4k", ignoreCase = true) == true || stream.title?.contains("2160", ignoreCase = true) == true
-        "1080p" -> stream.title?.contains("1080", ignoreCase = true) == true || stream.name?.contains("1080", ignoreCase = true) == true
-        "720p" -> stream.title?.contains("720", ignoreCase = true) == true || stream.name?.contains("720", ignoreCase = true) == true
-        "Torrent" -> stream.isTorrent
-        "Direct" -> stream.isDirectHttpUrl
-        else -> true
-      }
+      val qualityMatches = stream.matchesQualityFilter(selectedQualityFilter)
       addonMatches && qualityMatches
     }
   }
@@ -196,6 +189,25 @@ fun StreamSelectionSheet(
         }
       }
     }
+  }
+}
+
+private fun StremioStream.matchesQualityFilter(filter: String): Boolean {
+  if (filter == "All") return true
+  val fullText = listOfNotNull(
+    name,
+    title,
+    description,
+    behaviorHints?.filename,
+  ).joinToString(" ").lowercase()
+
+  return when (filter) {
+    "4K" -> fullText.contains("4k") || fullText.contains("2160p") || fullText.contains("2160") || fullText.contains("uhd")
+    "1080p" -> fullText.contains("1080p") || fullText.contains("1080") || fullText.contains("fhd")
+    "720p" -> fullText.contains("720p") || fullText.contains("720") || fullText.contains("hd")
+    "Torrent" -> isTorrent
+    "Direct" -> isDirectHttpUrl
+    else -> true
   }
 }
 
