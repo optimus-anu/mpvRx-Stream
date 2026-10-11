@@ -75,12 +75,25 @@ class AddonDiscoverViewModel(
 
   fun onSearchQueryChanged(query: String) {
     _searchQuery.value = query
-    if (query.isNotBlank()) {
-      performSearch(query)
-    } else {
+    if (query.isBlank()) {
       _searchResults.value = emptyList()
       _searchMovieResults.value = emptyList()
       _searchSeriesResults.value = emptyList()
+      _isSearching.value = false
+    }
+  }
+
+  fun performSearch() {
+    val query = _searchQuery.value.trim()
+    if (query.isBlank()) return
+    viewModelScope.launch {
+      _isSearching.value = true
+      val movieResults = addonManager.queryCatalogs("movie", "top", mapOf("search" to query))
+      val seriesResults = addonManager.queryCatalogs("series", "top", mapOf("search" to query))
+
+      _searchMovieResults.value = movieResults.distinctBy { it.id }
+      _searchSeriesResults.value = seriesResults.distinctBy { it.id }
+      _searchResults.value = (movieResults + seriesResults).distinctBy { it.id }
       _isSearching.value = false
     }
   }
@@ -119,16 +132,5 @@ class AddonDiscoverViewModel(
     }
   }
 
-  private fun performSearch(query: String) {
-    viewModelScope.launch {
-      _isSearching.value = true
-      val movieResults = addonManager.queryCatalogs("movie", "top", mapOf("search" to query))
-      val seriesResults = addonManager.queryCatalogs("series", "top", mapOf("search" to query))
 
-      _searchMovieResults.value = movieResults.distinctBy { it.id }
-      _searchSeriesResults.value = seriesResults.distinctBy { it.id }
-      _searchResults.value = (movieResults + seriesResults).distinctBy { it.id }
-      _isSearching.value = false
-    }
-  }
 }

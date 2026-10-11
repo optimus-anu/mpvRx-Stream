@@ -34,7 +34,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -109,8 +112,14 @@ object AddonDiscoverScreen : Screen {
             .padding(horizontal = 16.dp, vertical = 8.dp),
           placeholder = { Text("Search movies, TV series...") },
           singleLine = true,
+          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+          keyboardActions = KeyboardActions(
+            onSearch = { viewModel.performSearch() },
+          ),
           leadingIcon = {
-            Icon(Icons.RoundedFilled.Search, contentDescription = "Search")
+            IconButton(onClick = { viewModel.performSearch() }) {
+              Icon(Icons.RoundedFilled.Search, contentDescription = "Search")
+            }
           },
           trailingIcon = {
             if (searchQuery.isNotBlank()) {

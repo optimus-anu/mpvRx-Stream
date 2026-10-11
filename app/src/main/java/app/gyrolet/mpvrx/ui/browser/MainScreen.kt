@@ -689,6 +689,7 @@ object MainScreen : Screen {
                   .fillMaxWidth()
                   .navigationBarsPadding()
                   .padding(bottom = 8.dp),
+              contentAlignment = Alignment.BottomCenter,
             ) {
               val horizontalMargin by animateDpAsState(
                 targetValue = 58.dp - 30.dp * NavigationBarState.navLabelVisibility,
@@ -842,7 +843,7 @@ internal fun ExpressivePillNavigationBar(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
               ) {
-                Box(Modifier.size(iconSize).graphicsLayer { translationY = 2.dp.toPx() * labelFraction }
+                Box(Modifier.size(iconSize)
                   .then(if (active && tab != MainScreen.MainTab.PROFILE) Modifier.navigationAccentMask(accentBrush) else Modifier)) {
                   MainTabIcon(tab, if (active && tab != MainScreen.MainTab.PROFILE) Color.White else contentColor, null, iconSize)
                 }
